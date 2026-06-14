@@ -1,5 +1,5 @@
 pipeline {
-    agent { label 'node-b-worker' }
+    agent { label 'node-e-worker' }
 
     environment {
         IMAGE_NAME = "cookbook-app"
