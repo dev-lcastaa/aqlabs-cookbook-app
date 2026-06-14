@@ -14,6 +14,7 @@ pipeline {
                 echo '📋 Cloning pipeline helper scripts...'
                 sh '''
                 git clone $REPO_URL scripts
+                ls
                 '''
             }
         }
