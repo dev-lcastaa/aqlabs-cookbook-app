@@ -1,6 +1,6 @@
 pipeline {
     agent  {
-        label 'node-e-worker'
+        label 'node-d-worker'
     }
 
     stages {
