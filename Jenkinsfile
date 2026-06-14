@@ -1,59 +1,79 @@
 pipeline {
-    agent { label 'node-b-worker' }
+    agent { label 'node-c-worker' }
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+    }
 
     environment {
-        IMAGE_NAME = "cookbook-app"
-        IMAGE_TAG = "latest"
-        REPO_URL = "https://github.com/dev-lcastaa/aqlabs-pipeline-scripts.git"
+        COMPOSE_PROJECT_NAME = 'cookbook-app'
+        DOCKER_BUILDKIT = '1'
+        COMPOSE_DOCKER_CLI_BUILD = '1'
     }
 
     stages {
-
-        stage('Cloning Pipeline Helper Scripts') {
+        stage('Checkout Source') {
             steps {
-                echo '📋 Cloning pipeline helper scripts...'
+                echo '📥 Checking out source...'
+                checkout scm
+            }
+        }
+
+        stage('Validate Tooling') {
+            steps {
+                echo '🧰 Validating Docker and Compose availability...'
                 sh '''
-                git clone $REPO_URL scripts
-                ls
+                docker --version
+                docker compose version
                 '''
             }
         }
 
-        stage('Building App') {
+        stage('Frontend Quality Gate') {
             steps {
-                echo '🏗️ Running build script...'
+                echo '🧪 Running frontend lint and build...'
+                dir('frontend') {
+                    sh '''
+                    npm ci
+                    npm run lint
+                    npm run build
+                    '''
+                }
+            }
+        }
+
+        stage('Build Container Images') {
+            steps {
+                echo '🏗️🐳 Building backend and frontend images locally on this node...'
                 sh '''
-                cd ./scripts
-                chmod +x build.sh || true
-                ./build.sh
+                docker compose build
                 '''
             }
         }
 
-        stage('Running Tests') {
+        stage('Deploy Stack') {
             steps {
-                echo '👟 Running tests...'
+                echo '🚀 Deploying with docker compose...'
                 sh '''
-                chmod +x scripts/test.sh || true
-                ./scripts/test.sh
+                docker compose up -d --remove-orphans
+                docker compose ps
                 '''
             }
         }
 
-        stage('Building Docker Image  ') {
+        stage('Smoke Tests') {
             steps {
-                echo '🏗️🐋🖼️ Building Docker image...'
+                echo '🩺 Running smoke tests against deployed services...'
                 sh '''
-                docker container ls
-                '''
-            }
-        }
-
-        stage('Deploy with Docker Compose') {
-            steps {
-                echo '🚀🐋 Deploying with docker compose...'
-                sh '''
-                docker container ls
+                set +e
+                for i in $(seq 1 20); do
+                  curl -fsS http://localhost:8000/health >/dev/null && break
+                  sleep 3
+                done
+                curl -fsS http://localhost:8000/health
+                curl -fsS http://localhost:3000 >/dev/null
+                set -e
                 '''
             }
         }
@@ -61,15 +81,22 @@ pipeline {
 
     post {
         success {
-            echo '🎉✅ Pipeline completed successfully'
-            sh '''
-            echo "[ Post-build ] Cleaning up workspace..."
-            rm -rf scripts
-            '''
+            echo '✅ Pipeline completed successfully.'
         }
 
         failure {
-            echo '💥❌ Pipeline failed'
+            echo '❌ Pipeline failed. Collecting compose diagnostics...'
+            sh '''
+            docker compose ps || true
+            docker compose logs --no-color --tail=200 || true
+            '''
+        }
+
+        always {
+            echo '📊 Post-build compose status:'
+            sh '''
+            docker compose ps || true
+            '''
         }
     }
 }

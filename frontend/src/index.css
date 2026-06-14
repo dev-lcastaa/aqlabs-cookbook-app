@@ -1,0 +1,64 @@
+:root {
+  --bg: #070b12;
+  --bg-secondary: #0f1624;
+  --panel-bg: #141d30;
+  --panel-bg-soft: #121a2a;
+  --card-bg: #182236;
+  --border: #27364f;
+  --input-bg: #0f1728;
+  --input-border: #304463;
+  --text-main: #eff4ff;
+  --text-subtle: #9fb0ce;
+  --accent: #e8c455;
+  --focus-ring: #7bc6ff;
+  --danger: #ff6e76;
+  --shadow-panel: 0 20px 40px -28px rgba(0, 0, 0, 0.7);
+  --sans: 'Manrope', 'Avenir Next', 'Segoe UI', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--text-main);
+  background:
+    radial-gradient(circle at 12% 10%, #1e2f4f 0%, transparent 28%),
+    radial-gradient(circle at 82% 8%, #28395b 0%, transparent 34%),
+    linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg) 100%);
+  font-family: var(--sans);
+  line-height: 1.45;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5 {
+  margin: 0;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+h1 {
+  font-size: clamp(1.7rem, 5vw, 2.8rem);
+}
+
+h2 {
+  font-size: clamp(1.15rem, 4vw, 1.55rem);
+}
+
+h3 {
+  font-size: clamp(1.05rem, 3vw, 1.25rem);
+}
+
+p {
+  margin: 0;
+}
