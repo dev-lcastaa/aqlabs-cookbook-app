@@ -62,6 +62,12 @@ pipeline {
     post {
         success {
             echo '🎉✅ Pipeline completed successfully'
+            sh '''
+            ls
+            echo "[ Post-build ] Cleaning up workspace..."
+            cd ..
+            rm -rf scripts
+            '''
         }
 
         failure {
