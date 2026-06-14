@@ -4,9 +4,9 @@ pipeline {
     }
 
     stages {
-        stage('Build') {
+         stage('Test Docker') {
             steps {
-                echo 'Testing Pipeline on Node'
+                sh 'docker ps'
             }
         }
     }
