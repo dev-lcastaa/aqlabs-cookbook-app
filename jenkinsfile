@@ -1,0 +1,13 @@
+pipeline {
+    agent  {
+        label 'node-b-worker'
+    }
+
+    stages {
+        stage('Build') {
+            steps {
+                echo 'Testing Pipeline'
+            }
+        }
+    }
+}
