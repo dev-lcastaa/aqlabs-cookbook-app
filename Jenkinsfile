@@ -23,9 +23,9 @@ pipeline {
             steps {
                 echo '🏗️ Running build script...'
                 sh '''
-                cd scripts
-                chmod +x scripts/build.sh || true
-                ./scripts/build.sh
+                cd ./scripts
+                chmod +x build.sh || true
+                ./build.sh
                 '''
             }
         }
