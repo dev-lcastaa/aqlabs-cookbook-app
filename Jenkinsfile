@@ -44,7 +44,7 @@ pipeline {
             steps {
                 echo '🏗️🐋🖼️ Building Docker image...'
                 sh '''
-                ls
+                docker container ls
                 '''
             }
         }
@@ -53,7 +53,7 @@ pipeline {
             steps {
                 echo '🚀🐋 Deploying with docker compose...'
                 sh '''
-                ls
+                docker container ls
                 '''
             }
         }
