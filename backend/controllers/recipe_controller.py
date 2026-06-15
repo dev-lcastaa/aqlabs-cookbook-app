@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, status, UploadFile
 from sqlalchemy.orm import Session
 
 from db.database import get_db
-from models.schemas import RecipeCreate, RecipeRead, RecipeUpdate
-from service import recipe_service
+from models.schemas import RecipeCreate, RecipeRead, RecipeRipperParseRead, RecipeUpdate
+from service import recipe_ripper_service, recipe_service
 
 router = APIRouter(prefix="/api/recipes", tags=["recipes"])
 
@@ -14,6 +14,14 @@ def create_recipe(payload: RecipeCreate, db: Session = Depends(get_db)):
     if recipe is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cookbook not found")
     return recipe
+
+
+@router.post("/parse-from-images", response_model=RecipeRipperParseRead)
+def parse_recipe_from_images(files: list[UploadFile] = File(...)):
+    try:
+        return recipe_ripper_service.parse_recipe_from_images(files)
+    except recipe_ripper_service.RecipeRipperError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.get("", response_model=list[RecipeRead])

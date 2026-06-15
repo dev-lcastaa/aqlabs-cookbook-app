@@ -21,6 +21,7 @@ services:
       context: ./backend
     container_name: cookbook_backend
     environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
       DATABASE_URL: postgresql+psycopg2://cookbook:cookbook@db:5432/cookbook_db
     depends_on:
       db:

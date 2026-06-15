@@ -1,6 +1,11 @@
 pipeline {
     agent { label 'node-c-worker' }
 
+    parameters {
+        booleanParam(name: 'NO_CACHE_REBUILD', defaultValue: false, description: 'Rebuild Docker images with --no-cache')
+        booleanParam(name: 'PULL_BASE_IMAGES', defaultValue: true, description: 'Pull latest base images during build')
+    }
+
     options {
         timestamps()
         disableConcurrentBuilds()
@@ -13,6 +18,7 @@ pipeline {
     }
 
     stages {
+
         stage('Checkout Source') {
             steps {
                 echo '📥 Checking out source...'
@@ -46,19 +52,32 @@ pipeline {
         stage('Build Container Images') {
             steps {
                 echo '🏗️🐳 Building backend and frontend images locally on this node...'
-                sh '''
-                docker compose build
-                '''
+                script {
+                    def buildFlags = ''
+                    if (params.NO_CACHE_REBUILD) {
+                        buildFlags += ' --no-cache'
+                    }
+                    if (params.PULL_BASE_IMAGES) {
+                        buildFlags += ' --pull'
+                    }
+
+                    sh """
+                    docker compose build${buildFlags}
+                    """
+                }
             }
         }
 
         stage('Deploy Stack') {
             steps {
                 echo '🚀 Deploying with docker compose...'
-                sh '''
-                docker compose up -d --remove-orphans
-                docker compose ps
-                '''
+
+                withCredentials([string(credentialsId: 'openai-api-key', variable: 'OPENAI_API_KEY')]) {
+                    sh '''
+                    OPENAI_API_KEY=$OPENAI_API_KEY docker compose up -d --remove-orphans
+                    docker compose ps
+                    '''
+                }
             }
         }
 
@@ -67,12 +86,15 @@ pipeline {
                 echo '🩺 Running smoke tests against deployed services...'
                 sh '''
                 set +e
+
                 for i in $(seq 1 20); do
                   curl -fsS http://localhost:8000/health >/dev/null && break
                   sleep 3
                 done
+
                 curl -fsS http://localhost:8000/health
                 curl -fsS http://localhost:3000 >/dev/null
+
                 set -e
                 '''
             }
@@ -80,6 +102,7 @@ pipeline {
     }
 
     post {
+
         success {
             echo '✅ Pipeline completed successfully.'
         }

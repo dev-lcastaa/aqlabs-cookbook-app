@@ -28,6 +28,13 @@ class RecipeRead(RecipeBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class RecipeRipperParseRead(BaseModel):
+    recipe_name: str = Field(..., min_length=1, max_length=200)
+    ethnicity: str | None = Field(default=None, min_length=1, max_length=120)
+    ingredients: list[str] = Field(default_factory=list)
+    directions: str = Field(..., min_length=1)
+
+
 class CookbookBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     ethnicity: str = Field(..., min_length=1, max_length=120)
