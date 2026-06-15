@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from typing import Any
 
@@ -6,6 +7,8 @@ from fastapi import status
 from openai import OpenAI
 
 from models.schemas import AIRecommendationRead, AIRecommendationRequest
+
+logger = logging.getLogger(__name__)
 
 MODEL_NAME = "gpt-4.1"
 MAX_ATTEMPTS = 3
@@ -19,8 +22,10 @@ class AIRecommenderError(Exception):
 
 
 def recommend_recipe(payload: AIRecommendationRequest) -> AIRecommendationRead:
+    logger.info("recommend_recipe ethnicity=%r ingredients=%d reroll=%d", payload.ethnicity, len(payload.ingredients), payload.reroll_token)
     ingredients = _normalize_input_ingredients(payload.ingredients)
     if not ingredients:
+        logger.warning("recommend_recipe — empty ingredient list after normalisation")
         raise AIRecommenderError("Provide at least one valid ingredient")
 
     api_key = os.getenv("OPENAI_API_KEY")
@@ -46,6 +51,7 @@ def recommend_recipe(payload: AIRecommendationRequest) -> AIRecommendationRead:
 
     for attempt in range(MAX_ATTEMPTS):
         reroll_offset = payload.reroll_token + attempt
+        logger.info("recommend_recipe attempt=%d/%d reroll_offset=%d", attempt + 1, MAX_ATTEMPTS, reroll_offset)
         parsed = _query_recommendation(
             client=client,
             system_prompt=base_system_prompt,
@@ -56,6 +62,7 @@ def recommend_recipe(payload: AIRecommendationRequest) -> AIRecommendationRead:
 
         validated = _validate_model_recipe(parsed, ingredient_map)
         if validated is not None:
+            logger.info("recommend_recipe ok attempt=%d name=%r", attempt + 1, validated.get("recipe_name"))
             return AIRecommendationRead(
                 recipe_name=validated["recipe_name"],
                 ethnicity=payload.ethnicity,
@@ -64,8 +71,10 @@ def recommend_recipe(payload: AIRecommendationRequest) -> AIRecommendationRead:
                 reroll_token=payload.reroll_token + 1,
             )
 
+        logger.warning("recommend_recipe attempt=%d failed ingredient validation", attempt + 1)
         last_error = "Model returned ingredients outside your list; retrying failed"
 
+    logger.error("recommend_recipe exhausted %d attempts", MAX_ATTEMPTS)
     raise AIRecommenderError(last_error, status.HTTP_422_UNPROCESSABLE_ENTITY)
 
 

@@ -1,5 +1,6 @@
 import html
 import json
+import logging
 import os
 import re
 from typing import Any
@@ -11,6 +12,8 @@ from fastapi import status
 from openai import OpenAI
 
 from models.schemas import RecipeRipperParseRead, SocialRecipeRipperRequest
+
+logger = logging.getLogger(__name__)
 
 MODEL_NAME = "gpt-4.1"
 MAX_SOURCE_CHARS = 25000
@@ -27,10 +30,13 @@ class SocialRecipeRipperError(Exception):
 
 
 def parse_recipe_from_social_post(payload: SocialRecipeRipperRequest) -> RecipeRipperParseRead:
+    logger.info("parse_social_post url=%r", payload.url)
     source_text = _build_source_text(payload.text, payload.url)
     if not source_text:
+        logger.warning("parse_social_post — no usable content found for url=%r", payload.url)
         raise SocialRecipeRipperError("Provide a public URL that contains readable recipe content.")
 
+    logger.debug("parse_social_post source_chars=%d", len(source_text))
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise SocialRecipeRipperError(
@@ -56,6 +62,7 @@ def parse_recipe_from_social_post(payload: SocialRecipeRipperRequest) -> RecipeR
         f"SOURCE TEXT:\n{source_text}"
     )
 
+    logger.info("parse_social_post calling OpenAI model=%s", MODEL_NAME)
     try:
         client = OpenAI(api_key=api_key, timeout=45.0, max_retries=1)
         completion = client.chat.completions.create(
@@ -68,6 +75,7 @@ def parse_recipe_from_social_post(payload: SocialRecipeRipperRequest) -> RecipeR
             ],
         )
     except Exception as exc:
+        logger.error("parse_social_post OpenAI call failed: %s", exc)
         raise SocialRecipeRipperError(
             f"Failed to parse recipe with OpenAI: {exc}",
             status.HTTP_502_BAD_GATEWAY,
@@ -75,14 +83,17 @@ def parse_recipe_from_social_post(payload: SocialRecipeRipperRequest) -> RecipeR
 
     content = completion.choices[0].message.content if completion.choices else None
     if not content:
+        logger.error("parse_social_post OpenAI returned empty response")
         raise SocialRecipeRipperError("OpenAI returned an empty response", status.HTTP_502_BAD_GATEWAY)
 
     try:
         parsed = json.loads(content)
     except json.JSONDecodeError as exc:
+        logger.error("parse_social_post OpenAI returned malformed JSON")
         raise SocialRecipeRipperError("OpenAI returned malformed JSON", status.HTTP_502_BAD_GATEWAY) from exc
 
     normalized = _normalize_recipe_payload(parsed)
+    logger.info("parse_social_post ok name=%r", normalized.get("recipe_name"))
     return RecipeRipperParseRead(**normalized)
 
 
@@ -111,6 +122,7 @@ def _fetch_url_source(url: str) -> str:
         normalized_url = f"https://{normalized_url}"
 
     platform_hint = _infer_platform_hint(normalized_url)
+    logger.info("_fetch_url_source fetching url=%r platform=%s", normalized_url, platform_hint or "unknown")
 
     request = Request(normalized_url, headers={"User-Agent": "Mozilla/5.0"})
     response = None
@@ -145,7 +157,8 @@ def _fetch_url_source(url: str) -> str:
             source_parts.append(f"Visible page text:\n{visible_text}")
 
         return "\n".join(source_parts)[:MAX_FETCH_CHARS]
-    except (HTTPError, URLError, TimeoutError, ValueError, OSError):
+    except (HTTPError, URLError, TimeoutError, ValueError, OSError) as exc:
+        logger.warning("_fetch_url_source failed url=%r error=%s", normalized_url, exc)
         return ""
     finally:
         if response is not None:

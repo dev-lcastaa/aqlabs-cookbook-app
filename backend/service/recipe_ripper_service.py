@@ -1,5 +1,6 @@
 import base64
 import json
+import logging
 import os
 from typing import Any
 
@@ -7,6 +8,8 @@ from fastapi import UploadFile, status
 from openai import OpenAI
 
 from models.schemas import RecipeRipperParseRead
+
+logger = logging.getLogger(__name__)
 
 MODEL_NAME = "gpt-4.1"
 MAX_FILE_BYTES = 8 * 1024 * 1024
@@ -28,6 +31,7 @@ class RecipeRipperError(Exception):
 
 
 def parse_recipe_from_images(files: list[UploadFile]) -> RecipeRipperParseRead:
+    logger.info("parse_recipe_from_images file_count=%d", len(files))
     if not files:
         raise RecipeRipperError("At least one image is required")
     if len(files) > MAX_FILES:
@@ -78,6 +82,7 @@ def parse_recipe_from_images(files: list[UploadFile]) -> RecipeRipperParseRead:
         "If ethnicity is unknown, set it to null."
     )
 
+    logger.info("parse_recipe_from_images calling OpenAI model=%s images=%d", MODEL_NAME, len(image_contents))
     try:
         client = OpenAI(api_key=api_key, timeout=45.0, max_retries=1)
         completion = client.chat.completions.create(
@@ -93,6 +98,7 @@ def parse_recipe_from_images(files: list[UploadFile]) -> RecipeRipperParseRead:
             ],
         )
     except Exception as exc:
+        logger.error("parse_recipe_from_images OpenAI call failed: %s", exc)
         raise RecipeRipperError(
             f"Failed to parse recipe with OpenAI: {exc}",
             status.HTTP_502_BAD_GATEWAY,
