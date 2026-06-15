@@ -306,7 +306,12 @@ function App() {
                   className="card-main"
                   onClick={() => enterCookbook(cookbook.id)}
                 >
-                  <strong>{cookbook.name}</strong>
+                  <span className="tile-heading">
+                    <span className="tile-icon" aria-hidden="true">
+                      <BookIcon />
+                    </span>
+                    <strong>{cookbook.name}</strong>
+                  </span>
                   <span>{cookbook.ethnicity}</span>
                 </button>
                 <button
@@ -497,7 +502,12 @@ function App() {
                 ) : (
                   <>
                     <div className="recipe-title">
-                      <h4>{recipe.recipe_name}</h4>
+                      <span className="tile-heading">
+                        <span className="tile-icon" aria-hidden="true">
+                          <PageIcon />
+                        </span>
+                        <h4>{recipe.recipe_name}</h4>
+                      </span>
                       <span>{recipe.ethnicity}</span>
                     </div>
                     <h5>Ingredients</h5>
@@ -537,6 +547,27 @@ function parseIngredients(value) {
     .split('\n')
     .map((item) => item.trim())
     .filter((item) => item.length > 0)
+}
+
+function BookIcon() {
+  return (
+    <svg className="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M4 6.5A2.5 2.5 0 0 1 6.5 4H20v15.5a.5.5 0 0 1-.5.5H7a3 3 0 1 1 0-6h13" />
+      <path d="M8 8h8" />
+      <path d="M8 12h6" />
+    </svg>
+  )
+}
+
+function PageIcon() {
+  return (
+    <svg className="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M14 3H7.5A2.5 2.5 0 0 0 5 5.5v13A2.5 2.5 0 0 0 7.5 21h9A2.5 2.5 0 0 0 19 18.5V8z" />
+      <path d="M14 3v5h5" />
+      <path d="M8.5 13H15" />
+      <path d="M8.5 16H15" />
+    </svg>
+  )
 }
 
 export default App
