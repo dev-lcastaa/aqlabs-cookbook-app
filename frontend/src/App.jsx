@@ -53,6 +53,7 @@ function App() {
   const [massValue, setMassValue] = useState('1')
   const [massFrom, setMassFrom] = useState('lb')
   const [massTo, setMassTo] = useState('g')
+  const [activeToolTile, setActiveToolTile] = useState(null)
 
   const isInsideCookbook = selectedCookbookId !== null
   const selectedRecipe = selectedCookbook?.recipes?.find((recipe) => recipe.id === selectedRecipeId) ?? null
@@ -134,10 +135,12 @@ function App() {
 
   function enterToolsSection() {
     setActiveSection('tools')
+    setActiveToolTile(null)
   }
 
   function returnToHome() {
     setActiveSection('home')
+    setActiveToolTile(null)
     setSelectedCookbookId(null)
     setSelectedCookbook(null)
     setSelectedRecipeId(null)
@@ -158,6 +161,10 @@ function App() {
   function returnToRecipes() {
     setSelectedRecipeId(null)
     setEditingRecipeId(null)
+  }
+
+  function returnToToolList() {
+    setActiveToolTile(null)
   }
 
   async function refreshCurrentCookbook() {
@@ -350,120 +357,196 @@ function App() {
               <span className="tile-icon landing-icon" aria-hidden="true">
                 <ToolIcon />
               </span>
-              <strong>Converters</strong>
-              <span>Measurements and mass tools</span>
+              <strong>Tooling</strong>
+              <span>Converters and utilities</span>
             </button>
-
-            <div className="landing-card landing-card-disabled" aria-disabled="true">
-              <span className="tile-icon landing-icon" aria-hidden="true">
-                <SparkIcon />
-              </span>
-              <strong>Recipe Ripper</strong>
-              <span>Coming soon</span>
-            </div>
-
-            <div className="landing-card landing-card-disabled" aria-disabled="true">
-              <span className="tile-icon landing-icon" aria-hidden="true">
-                <BrainIcon />
-              </span>
-              <strong>AI Recommender</strong>
-              <span>Coming soon</span>
-            </div>
           </div>
         </section>
       ) : null}
 
       {activeSection === 'tools' ? (
         <section className="panel tools-view">
-          <div className="detail-head">
-            <div>
-              <BackButton label="Back to Main Page" onClick={returnToHome} />
-              <h2>Kitchen Tools</h2>
-              <p>Quick conversions for measurement and mass.</p>
-            </div>
-          </div>
+          {activeToolTile === null ? (
+            <>
+              <div className="detail-head">
+                <div>
+                  <BackButton label="Back to Main Page" onClick={returnToHome} />
+                  <h2>Kitchen Tools</h2>
+                  <p>Select a tile to open a tool page.</p>
+                </div>
+              </div>
 
-          <div className="tool-grid">
-            <article className="tool-card">
-              <div className="tile-heading">
-                <span className="tile-icon" aria-hidden="true">
-                  <CupIcon />
-                </span>
-                <h3>Measurement Converter</h3>
-              </div>
-              <div className="converter-grid">
-                <label>
-                  Amount
-                  <input
-                    value={measurementValue}
-                    onChange={(event) => setMeasurementValue(event.target.value)}
-                    inputMode="decimal"
-                  />
-                </label>
-                <label>
-                  From
-                  <select value={measurementFrom} onChange={(event) => setMeasurementFrom(event.target.value)}>
-                    {Object.entries(MEASUREMENT_UNITS).map(([value, unit]) => (
-                      <option key={value} value={value}>
-                        {unit.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  To
-                  <select value={measurementTo} onChange={(event) => setMeasurementTo(event.target.value)}>
-                    {Object.entries(MEASUREMENT_UNITS).map(([value, unit]) => (
-                      <option key={value} value={value}>
-                        {unit.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <p className="converter-result">Result: {measurementResult} {measurementTo}</p>
-            </article>
+              <div className="tool-grid tool-tile-grid">
+                <button
+                  type="button"
+                  className="landing-card"
+                  onClick={() => setActiveToolTile('mass')}
+                >
+                  <span className="tile-icon landing-icon" aria-hidden="true">
+                    <ScaleIcon />
+                  </span>
+                  <strong>Mass Converter</strong>
+                  <span>Convert grams, pounds, ounces, and more</span>
+                </button>
 
-            <article className="tool-card">
-              <div className="tile-heading">
-                <span className="tile-icon" aria-hidden="true">
-                  <ScaleIcon />
-                </span>
-                <h3>Mass Converter</h3>
+                <button
+                  type="button"
+                  className="landing-card"
+                  onClick={() => setActiveToolTile('measurement')}
+                >
+                  <span className="tile-icon landing-icon" aria-hidden="true">
+                    <CupIcon />
+                  </span>
+                  <strong>Measurement Converter</strong>
+                  <span>Convert cups, tablespoons, milliliters, and more</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="landing-card"
+                  onClick={() => setActiveToolTile('recipe-ripper')}
+                >
+                  <span className="tile-icon landing-icon" aria-hidden="true">
+                    <SparkIcon />
+                  </span>
+                  <strong>Recipe Ripper</strong>
+                  <span>Coming soon</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="landing-card"
+                  onClick={() => setActiveToolTile('ai-recommender')}
+                >
+                  <span className="tile-icon landing-icon" aria-hidden="true">
+                    <BrainIcon />
+                  </span>
+                  <strong>AI Recommender</strong>
+                  <span>Coming soon</span>
+                </button>
               </div>
-              <div className="converter-grid">
-                <label>
-                  Amount
-                  <input
-                    value={massValue}
-                    onChange={(event) => setMassValue(event.target.value)}
-                    inputMode="decimal"
-                  />
-                </label>
-                <label>
-                  From
-                  <select value={massFrom} onChange={(event) => setMassFrom(event.target.value)}>
-                    {Object.entries(MASS_UNITS).map(([value, unit]) => (
-                      <option key={value} value={value}>
-                        {unit.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  To
-                  <select value={massTo} onChange={(event) => setMassTo(event.target.value)}>
-                    {Object.entries(MASS_UNITS).map(([value, unit]) => (
-                      <option key={value} value={value}>
-                        {unit.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+            </>
+          ) : null}
+
+          {activeToolTile === 'mass' ? (
+            <>
+              <div className="detail-head">
+                <div>
+                  <BackButton label="Back to Tools" onClick={returnToToolList} />
+                  <h2>Mass Converter</h2>
+                  <p>Convert between common kitchen mass units.</p>
+                </div>
               </div>
-              <p className="converter-result">Result: {massResult} {massTo}</p>
-            </article>
-          </div>
+              <article className="tool-card tool-detail-card">
+                <div className="converter-grid">
+                  <label>
+                    Amount
+                    <input
+                      value={massValue}
+                      onChange={(event) => setMassValue(event.target.value)}
+                      inputMode="decimal"
+                    />
+                  </label>
+                  <label>
+                    From
+                    <select value={massFrom} onChange={(event) => setMassFrom(event.target.value)}>
+                      {Object.entries(MASS_UNITS).map(([value, unit]) => (
+                        <option key={value} value={value}>
+                          {unit.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    To
+                    <select value={massTo} onChange={(event) => setMassTo(event.target.value)}>
+                      {Object.entries(MASS_UNITS).map(([value, unit]) => (
+                        <option key={value} value={value}>
+                          {unit.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <p className="converter-result">Result: {massResult} {massTo}</p>
+              </article>
+            </>
+          ) : null}
+
+          {activeToolTile === 'measurement' ? (
+            <>
+              <div className="detail-head">
+                <div>
+                  <BackButton label="Back to Tools" onClick={returnToToolList} />
+                  <h2>Measurement Converter</h2>
+                  <p>Convert between common kitchen volume units.</p>
+                </div>
+              </div>
+              <article className="tool-card tool-detail-card">
+                <div className="converter-grid">
+                  <label>
+                    Amount
+                    <input
+                      value={measurementValue}
+                      onChange={(event) => setMeasurementValue(event.target.value)}
+                      inputMode="decimal"
+                    />
+                  </label>
+                  <label>
+                    From
+                    <select value={measurementFrom} onChange={(event) => setMeasurementFrom(event.target.value)}>
+                      {Object.entries(MEASUREMENT_UNITS).map(([value, unit]) => (
+                        <option key={value} value={value}>
+                          {unit.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    To
+                    <select value={measurementTo} onChange={(event) => setMeasurementTo(event.target.value)}>
+                      {Object.entries(MEASUREMENT_UNITS).map(([value, unit]) => (
+                        <option key={value} value={value}>
+                          {unit.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <p className="converter-result">Result: {measurementResult} {measurementTo}</p>
+              </article>
+            </>
+          ) : null}
+
+          {activeToolTile === 'recipe-ripper' ? (
+            <>
+              <div className="detail-head">
+                <div>
+                  <BackButton label="Back to Tools" onClick={returnToToolList} />
+                  <h2>Recipe Ripper</h2>
+                  <p>This tool is planned but not available yet.</p>
+                </div>
+              </div>
+              <article className="tool-card tool-detail-card">
+                <p className="empty-copy">Recipe Ripper is coming soon.</p>
+              </article>
+            </>
+          ) : null}
+
+          {activeToolTile === 'ai-recommender' ? (
+            <>
+              <div className="detail-head">
+                <div>
+                  <BackButton label="Back to Tools" onClick={returnToToolList} />
+                  <h2>AI Recommender</h2>
+                  <p>This tool is planned but not available yet.</p>
+                </div>
+              </div>
+              <article className="tool-card tool-detail-card">
+                <p className="empty-copy">AI Recommender is coming soon.</p>
+              </article>
+            </>
+          ) : null}
         </section>
       ) : null}
 
