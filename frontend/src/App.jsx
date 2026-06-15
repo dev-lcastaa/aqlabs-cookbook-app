@@ -10,10 +10,12 @@ function App() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  const [showCookbookForm, setShowCookbookForm] = useState(false)
   const [newCookbook, setNewCookbook] = useState({ name: '', ethnicity: '' })
   const [editingCookbook, setEditingCookbook] = useState(false)
   const [cookbookDraft, setCookbookDraft] = useState({ name: '', ethnicity: '' })
 
+  const [showRecipeForm, setShowRecipeForm] = useState(false)
   const [newRecipe, setNewRecipe] = useState({
     recipe_name: '',
     ethnicity: '',
@@ -28,7 +30,7 @@ function App() {
     directions: '',
   })
 
-  const hasSelection = selectedCookbookId !== null
+  const isInsideCookbook = selectedCookbookId !== null
 
   const cookbookCountLabel = useMemo(() => {
     if (cookbooks.length === 1) {
@@ -37,25 +39,15 @@ function App() {
     return `${cookbooks.length} cookbooks`
   }, [cookbooks.length])
 
-  const loadCookbooks = useCallback(async (preferredId) => {
+  const loadCookbooks = useCallback(async () => {
     try {
       setLoading(true)
       setError('')
       const list = await api.listCookbooks()
       setCookbooks(list)
 
-      const nextId =
-        preferredId ??
-        (selectedCookbookId && list.some((cb) => cb.id === selectedCookbookId)
-          ? selectedCookbookId
-          : list[0]?.id ?? null)
-
-      setSelectedCookbookId(nextId)
-
-      if (nextId !== null) {
-        const detail = await api.getCookbook(nextId)
-        setSelectedCookbook(detail)
-      } else {
+      if (selectedCookbookId && !list.some((cb) => cb.id === selectedCookbookId)) {
+        setSelectedCookbookId(null)
         setSelectedCookbook(null)
       }
     } catch (loadError) {
@@ -71,20 +63,37 @@ function App() {
     loadCookbooks()
   }, [loadCookbooks])
 
-  async function selectCookbook(cookbookId) {
+  async function enterCookbook(cookbookId) {
     try {
       setLoading(true)
       setError('')
-      setSelectedCookbookId(cookbookId)
       const detail = await api.getCookbook(cookbookId)
+      setSelectedCookbookId(cookbookId)
       setSelectedCookbook(detail)
       setEditingCookbook(false)
       setEditingRecipeId(null)
+      setShowRecipeForm(false)
     } catch (loadError) {
       setError(loadError.message)
     } finally {
       setLoading(false)
     }
+  }
+
+  function returnToCookbooks() {
+    setSelectedCookbookId(null)
+    setSelectedCookbook(null)
+    setEditingCookbook(false)
+    setEditingRecipeId(null)
+    setShowRecipeForm(false)
+  }
+
+  async function refreshCurrentCookbook() {
+    if (!selectedCookbookId) {
+      return
+    }
+    const detail = await api.getCookbook(selectedCookbookId)
+    setSelectedCookbook(detail)
   }
 
   async function handleCreateCookbook(event) {
@@ -102,12 +111,41 @@ function App() {
         ethnicity: newCookbook.ethnicity.trim(),
       })
       setNewCookbook({ name: '', ethnicity: '' })
-      await loadCookbooks(created.id)
+      setShowCookbookForm(false)
+      await loadCookbooks()
+      await enterCookbook(created.id)
     } catch (saveError) {
       setError(saveError.message)
     } finally {
       setSaving(false)
     }
+  }
+
+  async function handleDeleteCookbook(cookbookId) {
+    try {
+      setSaving(true)
+      setError('')
+      await api.deleteCookbook(cookbookId)
+      if (selectedCookbookId === cookbookId) {
+        returnToCookbooks()
+      }
+      await loadCookbooks()
+    } catch (saveError) {
+      setError(saveError.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function startEditingCookbook() {
+    if (!selectedCookbook) {
+      return
+    }
+    setEditingCookbook(true)
+    setCookbookDraft({
+      name: selectedCookbook.name,
+      ethnicity: selectedCookbook.ethnicity,
+    })
   }
 
   async function handleUpdateCookbook(event) {
@@ -124,20 +162,8 @@ function App() {
         ethnicity: cookbookDraft.ethnicity.trim(),
       })
       setEditingCookbook(false)
-      await loadCookbooks(selectedCookbookId)
-    } catch (saveError) {
-      setError(saveError.message)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function handleDeleteCookbook(cookbookId) {
-    try {
-      setSaving(true)
-      setError('')
-      await api.deleteCookbook(cookbookId)
       await loadCookbooks()
+      await refreshCurrentCookbook()
     } catch (saveError) {
       setError(saveError.message)
     } finally {
@@ -162,7 +188,8 @@ function App() {
         directions: newRecipe.directions.trim(),
       })
       setNewRecipe({ recipe_name: '', ethnicity: '', ingredients: '', directions: '' })
-      await loadCookbooks(selectedCookbookId)
+      setShowRecipeForm(false)
+      await refreshCurrentCookbook()
     } catch (saveError) {
       setError(saveError.message)
     } finally {
@@ -192,7 +219,7 @@ function App() {
         directions: recipeDraft.directions.trim(),
       })
       setEditingRecipeId(null)
-      await loadCookbooks(selectedCookbookId)
+      await refreshCurrentCookbook()
     } catch (saveError) {
       setError(saveError.message)
     } finally {
@@ -205,7 +232,7 @@ function App() {
       setSaving(true)
       setError('')
       await api.deleteRecipe(recipeId)
-      await loadCookbooks(selectedCookbookId)
+      await refreshCurrentCookbook()
     } catch (saveError) {
       setError(saveError.message)
     } finally {
@@ -213,68 +240,72 @@ function App() {
     }
   }
 
-  function startEditingCookbook() {
-    if (!selectedCookbook) {
-      return
-    }
-    setEditingCookbook(true)
-    setCookbookDraft({
-      name: selectedCookbook.name,
-      ethnicity: selectedCookbook.ethnicity,
-    })
-  }
-
   return (
     <div className="app-shell">
       <header className="header">
         <p className="eyebrow">AQLabs Kitchen</p>
         <h1>Cookbooks & Recipes</h1>
-        <p className="subtitle">Create, organize, and browse recipes by cookbook and ethnicity.</p>
+        <p className="subtitle">Track your cookbooks and open one to manage its recipes.</p>
       </header>
 
       {error ? <div className="error-banner">{error}</div> : null}
 
-      <div className="layout">
-        <aside className="panel left-panel">
+      {!isInsideCookbook ? (
+        <section className="panel home-view">
           <div className="panel-topline">
-            <h2>Cookbooks</h2>
-            <span>{cookbookCountLabel}</span>
+            <div>
+              <h2>Cookbooks</h2>
+              <p className="muted">{loading ? 'Loading...' : cookbookCountLabel}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowCookbookForm((prev) => !prev)}
+              disabled={saving}
+            >
+              {showCookbookForm ? 'Close' : 'Create Cookbook'}
+            </button>
           </div>
 
-          <form className="form-block" onSubmit={handleCreateCookbook}>
-            <label>
-              Name
-              <input
-                value={newCookbook.name}
-                onChange={(event) => setNewCookbook((prev) => ({ ...prev, name: event.target.value }))}
-                placeholder="Street Food Essentials"
-              />
-            </label>
-            <label>
-              Ethnicity
-              <input
-                value={newCookbook.ethnicity}
-                onChange={(event) =>
-                  setNewCookbook((prev) => ({ ...prev, ethnicity: event.target.value }))
-                }
-                placeholder="Thai"
-              />
-            </label>
-            <button type="submit" disabled={saving}>
-              {saving ? 'Saving...' : 'Create Cookbook'}
-            </button>
-          </form>
+          {showCookbookForm ? (
+            <form className="form-block" onSubmit={handleCreateCookbook}>
+              <label>
+                Name
+                <input
+                  value={newCookbook.name}
+                  onChange={(event) =>
+                    setNewCookbook((prev) => ({ ...prev, name: event.target.value }))
+                  }
+                  placeholder="Street Food Essentials"
+                />
+              </label>
+              <label>
+                Ethnicity
+                <input
+                  value={newCookbook.ethnicity}
+                  onChange={(event) =>
+                    setNewCookbook((prev) => ({ ...prev, ethnicity: event.target.value }))
+                  }
+                  placeholder="Thai"
+                />
+              </label>
+              <button type="submit" disabled={saving}>
+                {saving ? 'Saving...' : 'Save Cookbook'}
+              </button>
+            </form>
+          ) : null}
 
-          <div className="cookbook-list">
-            {loading ? <p className="muted">Loading cookbooks...</p> : null}
-            {!loading && cookbooks.length === 0 ? <p className="muted">No cookbooks yet.</p> : null}
+          {!loading && cookbooks.length === 0 ? (
+            <p className="empty-copy">No cookbooks</p>
+          ) : null}
 
+          <div className="cookbook-grid">
             {cookbooks.map((cookbook) => (
-              <article
-                key={cookbook.id}
-                className={`cookbook-card ${selectedCookbookId === cookbook.id ? 'active' : ''}`}
-              >
-                <button type="button" className="card-main" onClick={() => selectCookbook(cookbook.id)}>
+              <article className="cookbook-grid-card" key={cookbook.id}>
+                <button
+                  type="button"
+                  className="card-main"
+                  onClick={() => enterCookbook(cookbook.id)}
+                >
                   <strong>{cookbook.name}</strong>
                   <span>{cookbook.ethnicity}</span>
                 </button>
@@ -289,204 +320,214 @@ function App() {
               </article>
             ))}
           </div>
-        </aside>
-
-        <main className="panel right-panel">
-          {!hasSelection ? (
-            <div className="empty-state">
-              <h2>Select or create a cookbook</h2>
-              <p>Your recipes will appear here once a cookbook is selected.</p>
+        </section>
+      ) : (
+        <section className="panel cookbook-view">
+          <div className="detail-head">
+            <div>
+              <button type="button" className="ghost-link" onClick={returnToCookbooks}>
+                Back to Cookbooks
+              </button>
+              <h2>{selectedCookbook?.name}</h2>
+              <p>
+                Ethnicity: <strong>{selectedCookbook?.ethnicity}</strong>
+              </p>
             </div>
-          ) : (
-            <>
-              <div className="detail-head">
-                <div>
-                  <h2>{selectedCookbook?.name}</h2>
-                  <p>
-                    Ethnicity: <strong>{selectedCookbook?.ethnicity}</strong>
-                  </p>
-                </div>
-                <button type="button" onClick={startEditingCookbook} disabled={saving || loading}>
-                  Edit Cookbook
+            <div className="row-actions">
+              <button type="button" onClick={startEditingCookbook} disabled={saving || loading}>
+                Edit Cookbook
+              </button>
+              <button
+                type="button"
+                className="danger-link"
+                onClick={() => handleDeleteCookbook(selectedCookbookId)}
+                disabled={saving}
+              >
+                Delete Cookbook
+              </button>
+            </div>
+          </div>
+
+          {editingCookbook ? (
+            <form className="form-block inline-edit" onSubmit={handleUpdateCookbook}>
+              <label>
+                Name
+                <input
+                  value={cookbookDraft.name}
+                  onChange={(event) =>
+                    setCookbookDraft((prev) => ({ ...prev, name: event.target.value }))
+                  }
+                />
+              </label>
+              <label>
+                Ethnicity
+                <input
+                  value={cookbookDraft.ethnicity}
+                  onChange={(event) =>
+                    setCookbookDraft((prev) => ({ ...prev, ethnicity: event.target.value }))
+                  }
+                />
+              </label>
+              <div className="row-actions">
+                <button type="submit" disabled={saving}>
+                  Save
+                </button>
+                <button type="button" onClick={() => setEditingCookbook(false)}>
+                  Cancel
                 </button>
               </div>
+            </form>
+          ) : null}
 
-              {editingCookbook ? (
-                <form className="form-block inline-edit" onSubmit={handleUpdateCookbook}>
-                  <label>
-                    Name
-                    <input
-                      value={cookbookDraft.name}
-                      onChange={(event) =>
-                        setCookbookDraft((prev) => ({ ...prev, name: event.target.value }))
-                      }
-                    />
-                  </label>
-                  <label>
-                    Ethnicity
-                    <input
-                      value={cookbookDraft.ethnicity}
-                      onChange={(event) =>
-                        setCookbookDraft((prev) => ({ ...prev, ethnicity: event.target.value }))
-                      }
-                    />
-                  </label>
-                  <div className="row-actions">
-                    <button type="submit" disabled={saving}>
-                      Save
-                    </button>
-                    <button type="button" onClick={() => setEditingCookbook(false)}>
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              ) : null}
+          <div className="panel-topline recipe-topline">
+            <div>
+              <h3>Recipes</h3>
+              <p className="muted">{selectedCookbook?.recipes?.length || 0} total</p>
+            </div>
+            <button type="button" onClick={() => setShowRecipeForm((prev) => !prev)}>
+              {showRecipeForm ? 'Close' : 'Add Recipe'}
+            </button>
+          </div>
 
-              <section className="recipe-section">
-                <div className="panel-topline">
-                  <h3>Recipes</h3>
-                  <span>{selectedCookbook?.recipes?.length || 0} total</span>
-                </div>
+          {showRecipeForm ? (
+            <form className="form-block" onSubmit={handleCreateRecipe}>
+              <label>
+                Recipe Name
+                <input
+                  value={newRecipe.recipe_name}
+                  onChange={(event) =>
+                    setNewRecipe((prev) => ({ ...prev, recipe_name: event.target.value }))
+                  }
+                  placeholder="Tom Yum Soup"
+                />
+              </label>
+              <label>
+                Ethnicity (optional)
+                <input
+                  value={newRecipe.ethnicity}
+                  onChange={(event) =>
+                    setNewRecipe((prev) => ({ ...prev, ethnicity: event.target.value }))
+                  }
+                  placeholder="Defaults to cookbook ethnicity"
+                />
+              </label>
+              <label>
+                Ingredients (one per line)
+                <textarea
+                  value={newRecipe.ingredients}
+                  onChange={(event) =>
+                    setNewRecipe((prev) => ({ ...prev, ingredients: event.target.value }))
+                  }
+                  rows={4}
+                />
+              </label>
+              <label>
+                Directions
+                <textarea
+                  value={newRecipe.directions}
+                  onChange={(event) =>
+                    setNewRecipe((prev) => ({ ...prev, directions: event.target.value }))
+                  }
+                  rows={5}
+                />
+              </label>
+              <button type="submit" disabled={saving}>
+                {saving ? 'Saving...' : 'Save Recipe'}
+              </button>
+            </form>
+          ) : null}
 
-                <form className="form-block" onSubmit={handleCreateRecipe}>
-                  <label>
-                    Recipe Name
-                    <input
-                      value={newRecipe.recipe_name}
-                      onChange={(event) =>
-                        setNewRecipe((prev) => ({ ...prev, recipe_name: event.target.value }))
-                      }
-                      placeholder="Tom Yum Soup"
-                    />
-                  </label>
-                  <label>
-                    Ethnicity (optional)
-                    <input
-                      value={newRecipe.ethnicity}
-                      onChange={(event) =>
-                        setNewRecipe((prev) => ({ ...prev, ethnicity: event.target.value }))
-                      }
-                      placeholder="Defaults to cookbook ethnicity"
-                    />
-                  </label>
-                  <label>
-                    Ingredients (one per line)
-                    <textarea
-                      value={newRecipe.ingredients}
-                      onChange={(event) =>
-                        setNewRecipe((prev) => ({ ...prev, ingredients: event.target.value }))
-                      }
-                      rows={4}
-                    />
-                  </label>
-                  <label>
-                    Directions
-                    <textarea
-                      value={newRecipe.directions}
-                      onChange={(event) =>
-                        setNewRecipe((prev) => ({ ...prev, directions: event.target.value }))
-                      }
-                      rows={5}
-                    />
-                  </label>
-                  <button type="submit" disabled={saving}>
-                    {saving ? 'Saving...' : 'Add Recipe'}
-                  </button>
-                </form>
+          <div className="recipe-list">
+            {selectedCookbook?.recipes?.length ? null : <p className="empty-copy">No recipes</p>}
 
-                <div className="recipe-list">
-                  {selectedCookbook?.recipes?.length ? null : (
-                    <p className="muted">No recipes in this cookbook yet.</p>
-                  )}
-
-                  {selectedCookbook?.recipes?.map((recipe) => (
-                    <article className="recipe-card" key={recipe.id}>
-                      {editingRecipeId === recipe.id ? (
-                        <form className="form-block inline-edit" onSubmit={(event) => handleUpdateRecipe(event, recipe.id)}>
-                          <label>
-                            Recipe Name
-                            <input
-                              value={recipeDraft.recipe_name}
-                              onChange={(event) =>
-                                setRecipeDraft((prev) => ({ ...prev, recipe_name: event.target.value }))
-                              }
-                            />
-                          </label>
-                          <label>
-                            Ethnicity
-                            <input
-                              value={recipeDraft.ethnicity}
-                              onChange={(event) =>
-                                setRecipeDraft((prev) => ({ ...prev, ethnicity: event.target.value }))
-                              }
-                            />
-                          </label>
-                          <label>
-                            Ingredients
-                            <textarea
-                              value={recipeDraft.ingredients}
-                              onChange={(event) =>
-                                setRecipeDraft((prev) => ({ ...prev, ingredients: event.target.value }))
-                              }
-                              rows={4}
-                            />
-                          </label>
-                          <label>
-                            Directions
-                            <textarea
-                              value={recipeDraft.directions}
-                              onChange={(event) =>
-                                setRecipeDraft((prev) => ({ ...prev, directions: event.target.value }))
-                              }
-                              rows={5}
-                            />
-                          </label>
-                          <div className="row-actions">
-                            <button type="submit" disabled={saving}>
-                              Save
-                            </button>
-                            <button type="button" onClick={() => setEditingRecipeId(null)}>
-                              Cancel
-                            </button>
-                          </div>
-                        </form>
-                      ) : (
-                        <>
-                          <div className="recipe-title">
-                            <h4>{recipe.recipe_name}</h4>
-                            <span>{recipe.ethnicity}</span>
-                          </div>
-                          <h5>Ingredients</h5>
-                          <ul>
-                            {recipe.ingredients.map((item, index) => (
-                              <li key={`${recipe.id}-${index}`}>{item}</li>
-                            ))}
-                          </ul>
-                          <h5>Directions</h5>
-                          <p>{recipe.directions}</p>
-                          <div className="row-actions">
-                            <button type="button" onClick={() => startEditingRecipe(recipe)}>
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              className="danger-link"
-                              onClick={() => handleDeleteRecipe(recipe.id)}
-                              disabled={saving}
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </article>
-                  ))}
-                </div>
-              </section>
-            </>
-          )}
-        </main>
-      </div>
+            {selectedCookbook?.recipes?.map((recipe) => (
+              <article className="recipe-card" key={recipe.id}>
+                {editingRecipeId === recipe.id ? (
+                  <form
+                    className="form-block inline-edit"
+                    onSubmit={(event) => handleUpdateRecipe(event, recipe.id)}
+                  >
+                    <label>
+                      Recipe Name
+                      <input
+                        value={recipeDraft.recipe_name}
+                        onChange={(event) =>
+                          setRecipeDraft((prev) => ({ ...prev, recipe_name: event.target.value }))
+                        }
+                      />
+                    </label>
+                    <label>
+                      Ethnicity
+                      <input
+                        value={recipeDraft.ethnicity}
+                        onChange={(event) =>
+                          setRecipeDraft((prev) => ({ ...prev, ethnicity: event.target.value }))
+                        }
+                      />
+                    </label>
+                    <label>
+                      Ingredients
+                      <textarea
+                        value={recipeDraft.ingredients}
+                        onChange={(event) =>
+                          setRecipeDraft((prev) => ({ ...prev, ingredients: event.target.value }))
+                        }
+                        rows={4}
+                      />
+                    </label>
+                    <label>
+                      Directions
+                      <textarea
+                        value={recipeDraft.directions}
+                        onChange={(event) =>
+                          setRecipeDraft((prev) => ({ ...prev, directions: event.target.value }))
+                        }
+                        rows={5}
+                      />
+                    </label>
+                    <div className="row-actions">
+                      <button type="submit" disabled={saving}>
+                        Save
+                      </button>
+                      <button type="button" onClick={() => setEditingRecipeId(null)}>
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <>
+                    <div className="recipe-title">
+                      <h4>{recipe.recipe_name}</h4>
+                      <span>{recipe.ethnicity}</span>
+                    </div>
+                    <h5>Ingredients</h5>
+                    <ul>
+                      {recipe.ingredients.map((item, index) => (
+                        <li key={`${recipe.id}-${index}`}>{item}</li>
+                      ))}
+                    </ul>
+                    <h5>Directions</h5>
+                    <p>{recipe.directions}</p>
+                    <div className="row-actions">
+                      <button type="button" onClick={() => startEditingRecipe(recipe)}>
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="danger-link"
+                        onClick={() => handleDeleteRecipe(recipe.id)}
+                        disabled={saving}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </>
+                )}
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   )
 }
