@@ -72,7 +72,7 @@ pipeline {
             steps {
                 echo '🚀 Deploying with docker compose...'
 
-                withCredentials([string(credentialsId: 'openai-api-key', variable: 'OPENAI_API_KEY')]) {
+                withCredentials([string(credentialsId: 'OPENAI_API_KEY', variable: 'OPENAI_API_KEY')]) {
                     sh '''
                     OPENAI_API_KEY=$OPENAI_API_KEY docker compose up -d --remove-orphans
                     docker compose ps
