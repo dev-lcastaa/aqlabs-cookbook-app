@@ -58,12 +58,14 @@ label {
 
 input,
 textarea,
+select,
 button {
   font-family: inherit;
 }
 
 input,
-textarea {
+textarea,
+select {
   border: 1px solid var(--input-border);
   background: var(--input-bg);
   color: var(--text-main);
@@ -73,7 +75,8 @@ textarea {
 }
 
 input:focus,
-textarea:focus {
+textarea:focus,
+select:focus {
   outline: 2px solid var(--focus-ring);
   border-color: transparent;
 }
@@ -113,6 +116,64 @@ button:disabled {
   border-radius: 12px;
   padding: 0.65rem 0.8rem;
   background: color-mix(in srgb, var(--danger) 14%, transparent);
+}
+
+.landing-grid,
+.tool-grid {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.landing-card,
+.tool-card {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--card-bg);
+  padding: 1rem;
+}
+
+.landing-card {
+  width: 100%;
+  text-align: left;
+  display: grid;
+  gap: 0.55rem;
+  justify-items: start;
+  color: var(--text-main);
+}
+
+.landing-card strong {
+  font-size: 1.05rem;
+}
+
+.landing-card span:last-child {
+  color: var(--text-subtle);
+}
+
+.landing-card-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.landing-card-disabled:hover {
+  filter: none;
+  transform: none;
+}
+
+.landing-icon {
+  width: 1.8rem;
+  height: 1.8rem;
+}
+
+.converter-grid {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+}
+
+.converter-result {
+  margin-top: 0.85rem;
+  color: var(--accent);
+  font-weight: 700;
 }
 
 .cookbook-list,
@@ -321,18 +382,29 @@ button:disabled {
   margin: 0;
 }
 
-.ghost-link {
+.back-button {
   background: transparent;
   color: var(--text-subtle);
   padding: 0;
-  margin-bottom: 0.5rem;
+  margin-bottom: 1.4rem;
   border-radius: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
 }
 
-.ghost-link:hover {
+.back-button:hover {
   filter: none;
   transform: none;
   color: var(--text-main);
+}
+
+.back-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
 }
 
 .recipe-topline {
@@ -342,6 +414,14 @@ button:disabled {
 @media (min-width: 960px) {
   .app-shell {
     margin-top: 2.25rem;
+  }
+
+  .landing-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .tool-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .cookbook-grid {
@@ -358,6 +438,14 @@ button:disabled {
 }
 
 @media (min-width: 680px) and (max-width: 959px) {
+  .landing-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tool-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .cookbook-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

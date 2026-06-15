@@ -2,7 +2,23 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from './services/api'
 import './App.css'
 
+const MEASUREMENT_UNITS = {
+  tsp: { label: 'Teaspoon', toMilliliters: 4.92892 },
+  tbsp: { label: 'Tablespoon', toMilliliters: 14.7868 },
+  cup: { label: 'Cup', toMilliliters: 236.588 },
+  ml: { label: 'Milliliter', toMilliliters: 1 },
+  l: { label: 'Liter', toMilliliters: 1000 },
+}
+
+const MASS_UNITS = {
+  g: { label: 'Gram', toGrams: 1 },
+  kg: { label: 'Kilogram', toGrams: 1000 },
+  oz: { label: 'Ounce', toGrams: 28.3495 },
+  lb: { label: 'Pound', toGrams: 453.592 },
+}
+
 function App() {
+  const [activeSection, setActiveSection] = useState('home')
   const [cookbooks, setCookbooks] = useState([])
   const [selectedCookbookId, setSelectedCookbookId] = useState(null)
   const [selectedCookbook, setSelectedCookbook] = useState(null)
@@ -31,6 +47,13 @@ function App() {
     directions: '',
   })
 
+  const [measurementValue, setMeasurementValue] = useState('1')
+  const [measurementFrom, setMeasurementFrom] = useState('cup')
+  const [measurementTo, setMeasurementTo] = useState('ml')
+  const [massValue, setMassValue] = useState('1')
+  const [massFrom, setMassFrom] = useState('lb')
+  const [massTo, setMassTo] = useState('g')
+
   const isInsideCookbook = selectedCookbookId !== null
   const selectedRecipe = selectedCookbook?.recipes?.find((recipe) => recipe.id === selectedRecipeId) ?? null
 
@@ -40,6 +63,26 @@ function App() {
     }
     return `${cookbooks.length} cookbooks`
   }, [cookbooks.length])
+
+  const measurementResult = useMemo(() => {
+    const amount = Number(measurementValue)
+    if (Number.isNaN(amount)) {
+      return '--'
+    }
+    const base = amount * MEASUREMENT_UNITS[measurementFrom].toMilliliters
+    const converted = base / MEASUREMENT_UNITS[measurementTo].toMilliliters
+    return formatResult(converted)
+  }, [measurementFrom, measurementTo, measurementValue])
+
+  const massResult = useMemo(() => {
+    const amount = Number(massValue)
+    if (Number.isNaN(amount)) {
+      return '--'
+    }
+    const base = amount * MASS_UNITS[massFrom].toGrams
+    const converted = base / MASS_UNITS[massTo].toGrams
+    return formatResult(converted)
+  }, [massFrom, massTo, massValue])
 
   const loadCookbooks = useCallback(async () => {
     try {
@@ -71,6 +114,7 @@ function App() {
       setLoading(true)
       setError('')
       const detail = await api.getCookbook(cookbookId)
+      setActiveSection('cookbooks')
       setSelectedCookbookId(cookbookId)
       setSelectedCookbook(detail)
       setSelectedRecipeId(null)
@@ -84,7 +128,25 @@ function App() {
     }
   }
 
-  function returnToCookbooks() {
+  function enterCookbookSection() {
+    setActiveSection('cookbooks')
+  }
+
+  function enterToolsSection() {
+    setActiveSection('tools')
+  }
+
+  function returnToHome() {
+    setActiveSection('home')
+    setSelectedCookbookId(null)
+    setSelectedCookbook(null)
+    setSelectedRecipeId(null)
+    setEditingCookbook(false)
+    setEditingRecipeId(null)
+    setShowRecipeForm(false)
+  }
+
+  function returnToCookbookGrid() {
     setSelectedCookbookId(null)
     setSelectedCookbook(null)
     setSelectedRecipeId(null)
@@ -140,7 +202,7 @@ function App() {
       setError('')
       await api.deleteCookbook(cookbookId)
       if (selectedCookbookId === cookbookId) {
-        returnToCookbooks()
+        returnToCookbookGrid()
       }
       await loadCookbooks()
     } catch (saveError) {
@@ -260,16 +322,156 @@ function App() {
     <div className="app-shell">
       <header className="header">
         <p className="eyebrow">AQLabs Kitchen</p>
-        <h1>Cookbooks & Recipes</h1>
-        <p className="subtitle">Track your cookbooks and open one to manage its recipes.</p>
+        <h1>Cookbooks & Tools</h1>
+        <p className="subtitle">Browse cookbooks, open recipes, and use quick kitchen utilities from one place.</p>
       </header>
 
       {error ? <div className="error-banner">{error}</div> : null}
 
-      {!isInsideCookbook ? (
+      {activeSection === 'home' ? (
+        <section className="panel landing-view">
+          <div className="panel-topline landing-topline">
+            <div>
+              <h2>Main Page</h2>
+              <p className="muted">Choose where you want to go.</p>
+            </div>
+          </div>
+
+          <div className="landing-grid">
+            <button type="button" className="landing-card" onClick={enterCookbookSection}>
+              <span className="tile-icon landing-icon" aria-hidden="true">
+                <BookIcon />
+              </span>
+              <strong>Cookbooks</strong>
+              <span>{loading ? 'Loading cookbooks...' : cookbookCountLabel}</span>
+            </button>
+
+            <button type="button" className="landing-card" onClick={enterToolsSection}>
+              <span className="tile-icon landing-icon" aria-hidden="true">
+                <ToolIcon />
+              </span>
+              <strong>Converters</strong>
+              <span>Measurements and mass tools</span>
+            </button>
+
+            <div className="landing-card landing-card-disabled" aria-disabled="true">
+              <span className="tile-icon landing-icon" aria-hidden="true">
+                <SparkIcon />
+              </span>
+              <strong>Recipe Ripper</strong>
+              <span>Coming soon</span>
+            </div>
+
+            <div className="landing-card landing-card-disabled" aria-disabled="true">
+              <span className="tile-icon landing-icon" aria-hidden="true">
+                <BrainIcon />
+              </span>
+              <strong>AI Recommender</strong>
+              <span>Coming soon</span>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {activeSection === 'tools' ? (
+        <section className="panel tools-view">
+          <div className="detail-head">
+            <div>
+              <BackButton label="Back to Main Page" onClick={returnToHome} />
+              <h2>Kitchen Tools</h2>
+              <p>Quick conversions for measurement and mass.</p>
+            </div>
+          </div>
+
+          <div className="tool-grid">
+            <article className="tool-card">
+              <div className="tile-heading">
+                <span className="tile-icon" aria-hidden="true">
+                  <CupIcon />
+                </span>
+                <h3>Measurement Converter</h3>
+              </div>
+              <div className="converter-grid">
+                <label>
+                  Amount
+                  <input
+                    value={measurementValue}
+                    onChange={(event) => setMeasurementValue(event.target.value)}
+                    inputMode="decimal"
+                  />
+                </label>
+                <label>
+                  From
+                  <select value={measurementFrom} onChange={(event) => setMeasurementFrom(event.target.value)}>
+                    {Object.entries(MEASUREMENT_UNITS).map(([value, unit]) => (
+                      <option key={value} value={value}>
+                        {unit.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  To
+                  <select value={measurementTo} onChange={(event) => setMeasurementTo(event.target.value)}>
+                    {Object.entries(MEASUREMENT_UNITS).map(([value, unit]) => (
+                      <option key={value} value={value}>
+                        {unit.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <p className="converter-result">Result: {measurementResult} {measurementTo}</p>
+            </article>
+
+            <article className="tool-card">
+              <div className="tile-heading">
+                <span className="tile-icon" aria-hidden="true">
+                  <ScaleIcon />
+                </span>
+                <h3>Mass Converter</h3>
+              </div>
+              <div className="converter-grid">
+                <label>
+                  Amount
+                  <input
+                    value={massValue}
+                    onChange={(event) => setMassValue(event.target.value)}
+                    inputMode="decimal"
+                  />
+                </label>
+                <label>
+                  From
+                  <select value={massFrom} onChange={(event) => setMassFrom(event.target.value)}>
+                    {Object.entries(MASS_UNITS).map(([value, unit]) => (
+                      <option key={value} value={value}>
+                        {unit.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  To
+                  <select value={massTo} onChange={(event) => setMassTo(event.target.value)}>
+                    {Object.entries(MASS_UNITS).map(([value, unit]) => (
+                      <option key={value} value={value}>
+                        {unit.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <p className="converter-result">Result: {massResult} {massTo}</p>
+            </article>
+          </div>
+        </section>
+      ) : null}
+
+      {activeSection === 'cookbooks' && !isInsideCookbook ? (
         <section className="panel home-view">
           <div className="panel-topline">
             <div>
+              <BackButton label="Back to Main Page" onClick={returnToHome} />
               <h2>Cookbooks</h2>
               <p className="muted">{loading ? 'Loading...' : cookbookCountLabel}</p>
             </div>
@@ -329,20 +531,14 @@ function App() {
               </button>
             ))}
           </div>
-
-          {selectedCookbookId ? null : cookbooks.length === 0 ? null : (
-            <div className="action-bar">
-              <p className="muted">Select a cookbook tile to manage it.</p>
-            </div>
-          )}
         </section>
-      ) : selectedRecipe ? (
+      ) : null}
+
+      {activeSection === 'cookbooks' && selectedRecipe ? (
         <section className="panel recipe-detail-view">
           <div className="detail-head">
             <div>
-              <button type="button" className="ghost-link" onClick={returnToRecipes}>
-                Back to Recipes
-              </button>
+              <BackButton label="Back to Recipes" onClick={returnToRecipes} />
               <h2>{selectedRecipe.recipe_name}</h2>
               <p>
                 Ethnicity: <strong>{selectedRecipe.ethnicity}</strong>
@@ -426,13 +622,13 @@ function App() {
             </button>
           </div>
         </section>
-      ) : (
+      ) : null}
+
+      {activeSection === 'cookbooks' && isInsideCookbook && !selectedRecipe ? (
         <section className="panel cookbook-view">
           <div className="detail-head">
             <div>
-              <button type="button" className="ghost-link" onClick={returnToCookbooks}>
-                Back to Cookbooks
-              </button>
+              <BackButton label="Back to Cookbooks" onClick={returnToCookbookGrid} />
               <h2>{selectedCookbook?.name}</h2>
               <p>
                 Ethnicity: <strong>{selectedCookbook?.ethnicity}</strong>
@@ -563,8 +759,23 @@ function App() {
             </button>
           </div>
         </section>
-      )}
+      ) : null}
     </div>
+  )
+}
+
+function formatResult(value) {
+  return Number.isFinite(value) ? value.toFixed(2).replace(/\.00$/, '') : '--'
+}
+
+function BackButton({ label, onClick }) {
+  return (
+    <button type="button" className="back-button" onClick={onClick}>
+      <span className="back-icon" aria-hidden="true">
+        <ArrowLeftIcon />
+      </span>
+      <span>{label}</span>
+    </button>
   )
 }
 
@@ -585,6 +796,15 @@ function BookIcon() {
   )
 }
 
+function ArrowLeftIcon() {
+  return (
+    <svg className="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M19 12H5" />
+      <path d="m12 19-7-7 7-7" />
+    </svg>
+  )
+}
+
 function PageIcon() {
   return (
     <svg className="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -592,6 +812,56 @@ function PageIcon() {
       <path d="M14 3v5h5" />
       <path d="M8.5 13H15" />
       <path d="M8.5 16H15" />
+    </svg>
+  )
+}
+
+function ToolIcon() {
+  return (
+    <svg className="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M14.7 6.3a4 4 0 0 0-5.4 5.86L4 17.46V20h2.54l5.3-5.3a4 4 0 0 0 5.86-5.4l-3.22 3.22-2.48-2.48z" />
+    </svg>
+  )
+}
+
+function SparkIcon() {
+  return (
+    <svg className="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" />
+    </svg>
+  )
+}
+
+function BrainIcon() {
+  return (
+    <svg className="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M9.5 4a3.5 3.5 0 0 0-3.43 4.19A3.5 3.5 0 0 0 7 15v1a3 3 0 0 0 3 3" />
+      <path d="M14.5 4a3.5 3.5 0 0 1 3.43 4.19A3.5 3.5 0 0 1 17 15v1a3 3 0 0 1-3 3" />
+      <path d="M12 4v16" />
+      <path d="M9 9.5h3" />
+      <path d="M12 14.5h3" />
+    </svg>
+  )
+}
+
+function CupIcon() {
+  return (
+    <svg className="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M5 7h10v4a5 5 0 0 1-5 5 5 5 0 0 1-5-5z" />
+      <path d="M15 8h2a2 2 0 0 1 0 4h-2" />
+      <path d="M7 20h6" />
+    </svg>
+  )
+}
+
+function ScaleIcon() {
+  return (
+    <svg className="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M12 4v4" />
+      <path d="M7 8h10" />
+      <path d="M9 8 5.5 14h7z" />
+      <path d="m15 8 3.5 6h-7z" />
+      <path d="M4 20h16" />
     </svg>
   )
 }
