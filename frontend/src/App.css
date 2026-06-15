@@ -209,6 +209,29 @@ button:disabled {
   font-size: 0.9rem;
 }
 
+.ripper-upload-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+}
+
+.ripper-upload-choice {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #121212;
+  font-weight: 600;
+  padding: 0.55rem 0.95rem;
+  cursor: pointer;
+}
+
+.ripper-upload-choice:hover {
+  filter: brightness(1.06);
+}
+
 .ripper-upload-flow input[type='file'] {
   display: none;
 }
@@ -231,9 +254,19 @@ button:disabled {
   gap: 0.75rem;
 }
 
+.ripper-file-thumb {
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+
 .ripper-file-list span {
   color: var(--text-subtle);
   word-break: break-all;
+  flex: 1;
 }
 
 .cookbook-list,

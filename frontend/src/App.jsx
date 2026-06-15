@@ -89,6 +89,16 @@ function App() {
     return formatResult(converted)
   }, [massFrom, massTo, massValue])
 
+  const ripperFilePreviews = useMemo(
+    () =>
+      ripperFiles.map((file, index) => ({
+        id: `${file.name}-${file.lastModified}-${index}`,
+        name: file.name,
+        url: URL.createObjectURL(file),
+      })),
+    [ripperFiles]
+  )
+
   const loadCookbooks = useCallback(async () => {
     try {
       setLoading(true)
@@ -113,6 +123,12 @@ function App() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadCookbooks()
   }, [loadCookbooks])
+
+  useEffect(() => {
+    return () => {
+      ripperFilePreviews.forEach((preview) => URL.revokeObjectURL(preview.url))
+    }
+  }, [ripperFilePreviews])
 
   async function enterCookbook(cookbookId) {
     try {
@@ -172,6 +188,10 @@ function App() {
   function returnToToolList() {
     setActiveToolTile(null)
     resetRecipeRipper()
+  }
+
+  function returnToRecipeRipperList() {
+    setActiveToolTile('recipe-ripper')
   }
 
   function resetRecipeRipper() {
@@ -510,7 +530,7 @@ function App() {
                     <SparkIcon />
                   </span>
                   <strong>Recipe Ripper</strong>
-                  <span>Coming soon</span>
+                  <span>Open ripper options</span>
                 </button>
 
                 <button
@@ -624,30 +644,98 @@ function App() {
                 <div>
                   <BackButton label="Back to Tools" onClick={returnToToolList} />
                   <h2>Recipe Ripper</h2>
+                  <p>Select how you want to rip a recipe.</p>
+                </div>
+              </div>
+              <div className="tool-grid tool-tile-grid">
+                <button
+                  type="button"
+                  className="landing-card"
+                  onClick={() => setActiveToolTile('social-recipe-ripper')}
+                >
+                  <span className="tile-icon landing-icon" aria-hidden="true">
+                    <SparkIcon />
+                  </span>
+                  <strong>Social Media Recipe Ripper</strong>
+                  <span>Extract from social recipe posts and captions</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="landing-card"
+                  onClick={() => setActiveToolTile('photo-recipe-ripper')}
+                >
+                  <span className="tile-icon landing-icon" aria-hidden="true">
+                    <PageIcon />
+                  </span>
+                  <strong>Photo Recipe Ripper</strong>
+                  <span>Extract from recipe photos and handwritten notes</span>
+                </button>
+              </div>
+            </>
+          ) : null}
+
+          {activeToolTile === 'social-recipe-ripper' ? (
+            <>
+              <div className="detail-head">
+                <div>
+                  <BackButton label="Back to Recipe Ripper" onClick={returnToRecipeRipperList} />
+                  <h2>Social Media Recipe Ripper</h2>
+                  <p>This flow is planned but not available yet.</p>
+                </div>
+              </div>
+              <article className="tool-card tool-detail-card">
+                <p className="empty-copy">Social Media Recipe Ripper is coming soon.</p>
+              </article>
+            </>
+          ) : null}
+
+          {activeToolTile === 'photo-recipe-ripper' ? (
+            <>
+              <div className="detail-head">
+                <div>
+                  <BackButton label="Back to Recipe Ripper" onClick={returnToRecipeRipperList} />
+                  <h2>Photo Recipe Ripper</h2>
                   <p>Upload recipe photos, parse with AI, review, and save to a cookbook.</p>
                 </div>
               </div>
               <article className="tool-card tool-detail-card">
                 {!ripperDraft ? (
                   <div className="ripper-upload-flow">
-                    <label htmlFor="ripper-file-input" className="ripper-upload-zone">
+                    <div className="ripper-upload-zone">
                       <strong>Take or upload recipe photos</strong>
                       <span>Add up to 5 images (JPG, PNG, WEBP, or HEIC).</span>
-                    </label>
+                      <div className="ripper-upload-actions">
+                        <label htmlFor="ripper-camera-input" className="ripper-upload-choice">
+                          Take Photo
+                        </label>
+                        <label htmlFor="ripper-file-input" className="ripper-upload-choice">
+                          Upload
+                        </label>
+                      </div>
+                    </div>
                     <input
-                      id="ripper-file-input"
+                      id="ripper-camera-input"
                       type="file"
                       accept="image/*"
                       capture="environment"
                       multiple
                       onChange={handleRecipeRipperFileChange}
                     />
+                    <input
+                      id="ripper-file-input"
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleRecipeRipperFileChange}
+                    />
 
                     {ripperFiles.length ? (
                       <ul className="ripper-file-list">
-                        {ripperFiles.map((file, index) => (
-                          <li key={`${file.name}-${file.lastModified}-${index}`}>
-                            <span>{file.name}</span>
+                        {ripperFilePreviews.map((preview, index) => (
+                          <li key={preview.id}>
+                            <img src={preview.url} alt={preview.name} className="ripper-file-thumb" />
+                            <span>{preview.name}</span>
                             <button type="button" className="danger-link" onClick={() => removeRecipeRipperFile(index)}>
                               Remove
                             </button>
