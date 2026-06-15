@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, status, Uplo
 from sqlalchemy.orm import Session
 
 from db.database import get_db
-from models.schemas import RecipeCreate, RecipeRead, RecipeRipperParseRead, RecipeUpdate
-from service import recipe_ripper_service, recipe_service
+from models.schemas import AIRecommendationRead, AIRecommendationRequest, RecipeCreate, RecipeRead, RecipeRipperParseRead, RecipeUpdate
+from service import recipe_recommender_service, recipe_ripper_service, recipe_service
 
 router = APIRouter(prefix="/api/recipes", tags=["recipes"])
 
@@ -21,6 +21,14 @@ def parse_recipe_from_images(files: list[UploadFile] = File(...)):
     try:
         return recipe_ripper_service.parse_recipe_from_images(files)
     except recipe_ripper_service.RecipeRipperError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+@router.post("/recommend", response_model=AIRecommendationRead)
+def recommend_recipe(payload: AIRecommendationRequest):
+    try:
+        return recipe_recommender_service.recommend_recipe(payload)
+    except recipe_recommender_service.AIRecommenderError as exc:
         raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 

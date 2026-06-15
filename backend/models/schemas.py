@@ -35,6 +35,20 @@ class RecipeRipperParseRead(BaseModel):
     directions: str = Field(..., min_length=1)
 
 
+class AIRecommendationRequest(BaseModel):
+    ethnicity: str = Field(..., min_length=1, max_length=120)
+    ingredients: list[str] = Field(..., min_length=1, max_length=50)
+    reroll_token: int = Field(default=0, ge=0)
+
+
+class AIRecommendationRead(BaseModel):
+    recipe_name: str = Field(..., min_length=1, max_length=200)
+    ethnicity: str = Field(..., min_length=1, max_length=120)
+    ingredients: list[str] = Field(default_factory=list)
+    directions: str = Field(..., min_length=1)
+    reroll_token: int = Field(..., ge=0)
+
+
 class CookbookBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     ethnicity: str = Field(..., min_length=1, max_length=120)
