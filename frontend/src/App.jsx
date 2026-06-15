@@ -54,6 +54,10 @@ function App() {
   const [massFrom, setMassFrom] = useState('lb')
   const [massTo, setMassTo] = useState('g')
   const [activeToolTile, setActiveToolTile] = useState(null)
+  const [ripperFiles, setRipperFiles] = useState([])
+  const [ripperParsing, setRipperParsing] = useState(false)
+  const [ripperDraft, setRipperDraft] = useState(null)
+  const [ripperTargetCookbookId, setRipperTargetCookbookId] = useState('')
 
   const isInsideCookbook = selectedCookbookId !== null
   const selectedRecipe = selectedCookbook?.recipes?.find((recipe) => recipe.id === selectedRecipeId) ?? null
@@ -136,11 +140,13 @@ function App() {
   function enterToolsSection() {
     setActiveSection('tools')
     setActiveToolTile(null)
+    resetRecipeRipper()
   }
 
   function returnToHome() {
     setActiveSection('home')
     setActiveToolTile(null)
+    resetRecipeRipper()
     setSelectedCookbookId(null)
     setSelectedCookbook(null)
     setSelectedRecipeId(null)
@@ -165,6 +171,14 @@ function App() {
 
   function returnToToolList() {
     setActiveToolTile(null)
+    resetRecipeRipper()
+  }
+
+  function resetRecipeRipper() {
+    setRipperFiles([])
+    setRipperDraft(null)
+    setRipperParsing(false)
+    setRipperTargetCookbookId('')
   }
 
   async function refreshCurrentCookbook() {
@@ -318,6 +332,92 @@ function App() {
         setSelectedRecipeId(null)
       }
       await refreshCurrentCookbook()
+    } catch (saveError) {
+      setError(saveError.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function handleRecipeRipperFileChange(event) {
+    const files = Array.from(event.target.files || [])
+    if (!files.length) {
+      return
+    }
+    setError('')
+    setRipperFiles((prev) => [...prev, ...files].slice(0, 5))
+    event.target.value = ''
+  }
+
+  function removeRecipeRipperFile(index) {
+    setRipperFiles((prev) => prev.filter((_, fileIndex) => fileIndex !== index))
+  }
+
+  async function parseRecipeFromImages() {
+    if (!ripperFiles.length) {
+      setError('Add at least one recipe image before parsing.')
+      return
+    }
+
+    try {
+      setError('')
+      setRipperParsing(true)
+      const formData = new FormData()
+      ripperFiles.forEach((file) => {
+        formData.append('files', file)
+      })
+
+      const parsed = await api.parseRecipeFromImages(formData)
+      setRipperDraft({
+        recipe_name: parsed.recipe_name || '',
+        ethnicity: parsed.ethnicity || '',
+        ingredients: Array.isArray(parsed.ingredients) ? parsed.ingredients.join('\n') : '',
+        directions: parsed.directions || '',
+      })
+
+      if (selectedCookbookId) {
+        setRipperTargetCookbookId(String(selectedCookbookId))
+      }
+    } catch (parseError) {
+      setError(parseError.message)
+    } finally {
+      setRipperParsing(false)
+    }
+  }
+
+  async function saveRippedRecipe(event) {
+    event.preventDefault()
+    if (!ripperDraft) {
+      return
+    }
+
+    const cookbookId = Number(ripperTargetCookbookId)
+    if (!cookbookId) {
+      setError('Select a target cookbook before saving.')
+      return
+    }
+
+    if (!ripperDraft.recipe_name.trim() || !ripperDraft.directions.trim()) {
+      setError('Recipe name and directions are required before saving.')
+      return
+    }
+
+    try {
+      setSaving(true)
+      setError('')
+      await api.createRecipe({
+        cookbook_id: cookbookId,
+        recipe_name: ripperDraft.recipe_name.trim(),
+        ethnicity: ripperDraft.ethnicity.trim() || null,
+        ingredients: parseIngredients(ripperDraft.ingredients),
+        directions: ripperDraft.directions.trim(),
+      })
+
+      if (selectedCookbookId === cookbookId) {
+        await refreshCurrentCookbook()
+      }
+
+      returnToToolList()
     } catch (saveError) {
       setError(saveError.message)
     } finally {
@@ -524,11 +624,120 @@ function App() {
                 <div>
                   <BackButton label="Back to Tools" onClick={returnToToolList} />
                   <h2>Recipe Ripper</h2>
-                  <p>This tool is planned but not available yet.</p>
+                  <p>Upload recipe photos, parse with AI, review, and save to a cookbook.</p>
                 </div>
               </div>
               <article className="tool-card tool-detail-card">
-                <p className="empty-copy">Recipe Ripper is coming soon.</p>
+                {!ripperDraft ? (
+                  <div className="ripper-upload-flow">
+                    <label htmlFor="ripper-file-input" className="ripper-upload-zone">
+                      <strong>Take or upload recipe photos</strong>
+                      <span>Add up to 5 images (JPG, PNG, WEBP, or HEIC).</span>
+                    </label>
+                    <input
+                      id="ripper-file-input"
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      multiple
+                      onChange={handleRecipeRipperFileChange}
+                    />
+
+                    {ripperFiles.length ? (
+                      <ul className="ripper-file-list">
+                        {ripperFiles.map((file, index) => (
+                          <li key={`${file.name}-${file.lastModified}-${index}`}>
+                            <span>{file.name}</span>
+                            <button type="button" className="danger-link" onClick={() => removeRecipeRipperFile(index)}>
+                              Remove
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="empty-copy">No images selected.</p>
+                    )}
+
+                    <div className="row-actions">
+                      <button type="button" onClick={parseRecipeFromImages} disabled={ripperParsing || saving || !ripperFiles.length}>
+                        {ripperParsing ? 'Parsing...' : 'Parse Recipe'}
+                      </button>
+                      {ripperFiles.length ? (
+                        <button type="button" onClick={resetRecipeRipper} disabled={ripperParsing || saving}>
+                          Reset
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : (
+                  <form className="form-block" onSubmit={saveRippedRecipe}>
+                    <label>
+                      Recipe Name
+                      <input
+                        value={ripperDraft.recipe_name}
+                        onChange={(event) =>
+                          setRipperDraft((prev) => ({ ...prev, recipe_name: event.target.value }))
+                        }
+                      />
+                    </label>
+
+                    <label>
+                      Target Cookbook
+                      <select
+                        value={ripperTargetCookbookId}
+                        onChange={(event) => setRipperTargetCookbookId(event.target.value)}
+                      >
+                        <option value="">Select a cookbook</option>
+                        {cookbooks.map((cookbook) => (
+                          <option key={cookbook.id} value={cookbook.id}>
+                            {cookbook.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label>
+                      Ethnicity (optional)
+                      <input
+                        value={ripperDraft.ethnicity}
+                        onChange={(event) =>
+                          setRipperDraft((prev) => ({ ...prev, ethnicity: event.target.value }))
+                        }
+                      />
+                    </label>
+
+                    <label>
+                      Ingredients (one per line)
+                      <textarea
+                        value={ripperDraft.ingredients}
+                        onChange={(event) =>
+                          setRipperDraft((prev) => ({ ...prev, ingredients: event.target.value }))
+                        }
+                        rows={5}
+                      />
+                    </label>
+
+                    <label>
+                      Directions
+                      <textarea
+                        value={ripperDraft.directions}
+                        onChange={(event) =>
+                          setRipperDraft((prev) => ({ ...prev, directions: event.target.value }))
+                        }
+                        rows={6}
+                      />
+                    </label>
+
+                    <div className="row-actions">
+                      <button type="submit" disabled={saving || ripperParsing}>
+                        {saving ? 'Saving...' : 'Save Recipe'}
+                      </button>
+                      <button type="button" onClick={resetRecipeRipper} disabled={saving || ripperParsing}>
+                        Start Over
+                      </button>
+                    </div>
+                  </form>
+                )}
               </article>
             </>
           ) : null}

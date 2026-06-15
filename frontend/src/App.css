@@ -186,6 +186,56 @@ button:disabled {
   margin-top: 0.95rem;
 }
 
+.ripper-upload-flow {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.ripper-upload-zone {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+  cursor: pointer;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.ripper-upload-zone strong {
+  color: var(--text-main);
+}
+
+.ripper-upload-zone span {
+  color: var(--text-subtle);
+  font-size: 0.9rem;
+}
+
+.ripper-upload-flow input[type='file'] {
+  display: none;
+}
+
+.ripper-file-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.ripper-file-list li {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.55rem 0.7rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ripper-file-list span {
+  color: var(--text-subtle);
+  word-break: break-all;
+}
+
 .cookbook-list,
 .recipe-list {
   display: grid;

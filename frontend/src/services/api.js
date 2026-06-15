@@ -22,6 +22,26 @@ async function request(path, options = {}) {
   return data
 }
 
+async function requestForm(path, formData, options = {}) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: options.method || 'POST',
+    body: formData,
+    ...(options || {}),
+  })
+
+  if (response.status === 204) {
+    return null
+  }
+
+  const data = await response.json().catch(() => null)
+  if (!response.ok) {
+    const errorMessage = data?.detail || 'Request failed'
+    throw new Error(errorMessage)
+  }
+
+  return data
+}
+
 export const api = {
   listCookbooks() {
     return request('/cookbooks')
@@ -67,6 +87,11 @@ export const api = {
   deleteRecipe(recipeId) {
     return request(`/recipes/${recipeId}`, {
       method: 'DELETE',
+    })
+  },
+  parseRecipeFromImages(formData) {
+    return requestForm('/recipes/parse-from-images', formData, {
+      method: 'POST',
     })
   },
 }
