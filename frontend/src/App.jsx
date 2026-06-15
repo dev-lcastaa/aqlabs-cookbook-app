@@ -64,6 +64,7 @@ function App() {
   const [recommenderRecipe, setRecommenderRecipe] = useState(null)
   const [recommenderRerollToken, setRecommenderRerollToken] = useState(0)
   const [recommenderLocked, setRecommenderLocked] = useState(false)
+  const [recommenderTargetCookbookId, setRecommenderTargetCookbookId] = useState('')
 
   const isInsideCookbook = selectedCookbookId !== null
   const selectedRecipe = selectedCookbook?.recipes?.find((recipe) => recipe.id === selectedRecipeId) ?? null
@@ -217,6 +218,7 @@ function App() {
     setRecommenderRecipe(null)
     setRecommenderRerollToken(0)
     setRecommenderLocked(false)
+    setRecommenderTargetCookbookId('')
   }
 
   async function refreshCurrentCookbook() {
@@ -517,6 +519,37 @@ function App() {
     }
   }
 
+  async function saveRecommendedRecipe() {
+    if (!recommenderRecipe) {
+      return
+    }
+    const cookbookId = Number(recommenderTargetCookbookId)
+    if (!cookbookId) {
+      setError('Select a target cookbook before saving.')
+      return
+    }
+    try {
+      setSaving(true)
+      setError('')
+      await api.createRecipe({
+        cookbook_id: cookbookId,
+        recipe_name: recommenderRecipe.recipe_name,
+        ethnicity: recommenderRecipe.ethnicity || null,
+        ingredients: recommenderRecipe.ingredients,
+        directions: recommenderRecipe.directions,
+      })
+      if (selectedCookbookId === cookbookId) {
+        await refreshCurrentCookbook()
+      }
+      resetRecommender()
+      returnToToolList()
+    } catch (saveError) {
+      setError(saveError.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="app-shell">
       <header className="header">
@@ -614,7 +647,7 @@ function App() {
                     <BrainIcon />
                   </span>
                   <strong>AI Recommender</strong>
-                  <span>Coming soon</span>
+                  <span>Generate recipes from your ingredients</span>
                 </button>
               </div>
             </>
@@ -946,11 +979,31 @@ function App() {
                     </ul>
                     <h4>Directions</h4>
                     <p>{recommenderRecipe.directions}</p>
+
+                    <label style={{ marginTop: '0.75rem', display: 'grid', gap: '0.35rem', fontSize: '0.85rem', color: 'var(--text-subtle)' }}>
+                      Save to Cookbook
+                      <select
+                        value={recommenderTargetCookbookId}
+                        onChange={(event) => setRecommenderTargetCookbookId(event.target.value)}
+                        disabled={saving}
+                      >
+                        <option value="">Select a cookbook</option>
+                        {cookbooks.map((cookbook) => (
+                          <option key={cookbook.id} value={cookbook.id}>
+                            {cookbook.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
                     <div className="row-actions">
-                      <button type="button" onClick={rerollRecommendation} disabled={recommenderLoading}>
+                      <button type="button" onClick={saveRecommendedRecipe} disabled={saving || recommenderLoading || !recommenderTargetCookbookId}>
+                        {saving ? 'Saving...' : 'Save Recipe'}
+                      </button>
+                      <button type="button" onClick={rerollRecommendation} disabled={recommenderLoading || saving}>
                         {recommenderLoading ? 'Rerolling...' : 'Reroll'}
                       </button>
-                      <button type="button" onClick={resetRecommender} disabled={recommenderLoading}>
+                      <button type="button" onClick={resetRecommender} disabled={recommenderLoading || saving}>
                         Start Over
                       </button>
                     </div>
