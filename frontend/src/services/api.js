@@ -94,4 +94,10 @@ export const api = {
       method: 'POST',
     })
   },
+  recommendRecipe(payload) {
+    return request('/recipes/recommend', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
 }

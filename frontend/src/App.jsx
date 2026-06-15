@@ -58,6 +58,12 @@ function App() {
   const [ripperParsing, setRipperParsing] = useState(false)
   const [ripperDraft, setRipperDraft] = useState(null)
   const [ripperTargetCookbookId, setRipperTargetCookbookId] = useState('')
+  const [recommenderEthnicity, setRecommenderEthnicity] = useState('')
+  const [recommenderIngredients, setRecommenderIngredients] = useState('')
+  const [recommenderLoading, setRecommenderLoading] = useState(false)
+  const [recommenderRecipe, setRecommenderRecipe] = useState(null)
+  const [recommenderRerollToken, setRecommenderRerollToken] = useState(0)
+  const [recommenderLocked, setRecommenderLocked] = useState(false)
 
   const isInsideCookbook = selectedCookbookId !== null
   const selectedRecipe = selectedCookbook?.recipes?.find((recipe) => recipe.id === selectedRecipeId) ?? null
@@ -157,12 +163,14 @@ function App() {
     setActiveSection('tools')
     setActiveToolTile(null)
     resetRecipeRipper()
+    resetRecommender()
   }
 
   function returnToHome() {
     setActiveSection('home')
     setActiveToolTile(null)
     resetRecipeRipper()
+    resetRecommender()
     setSelectedCookbookId(null)
     setSelectedCookbook(null)
     setSelectedRecipeId(null)
@@ -188,6 +196,7 @@ function App() {
   function returnToToolList() {
     setActiveToolTile(null)
     resetRecipeRipper()
+    resetRecommender()
   }
 
   function returnToRecipeRipperList() {
@@ -199,6 +208,15 @@ function App() {
     setRipperDraft(null)
     setRipperParsing(false)
     setRipperTargetCookbookId('')
+  }
+
+  function resetRecommender() {
+    setRecommenderEthnicity('')
+    setRecommenderIngredients('')
+    setRecommenderLoading(false)
+    setRecommenderRecipe(null)
+    setRecommenderRerollToken(0)
+    setRecommenderLocked(false)
   }
 
   async function refreshCurrentCookbook() {
@@ -442,6 +460,60 @@ function App() {
       setError(saveError.message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function recommendRecipeWithCurrentInputs(event) {
+    event.preventDefault()
+    const ethnicity = recommenderEthnicity.trim()
+    const ingredients = parseIngredients(recommenderIngredients)
+
+    if (!ethnicity || !ingredients.length) {
+      setError('Provide an ethnicity and at least one ingredient.')
+      return
+    }
+
+    try {
+      setError('')
+      setRecommenderLoading(true)
+      const recommendation = await api.recommendRecipe({
+        ethnicity,
+        ingredients,
+        reroll_token: 0,
+      })
+      setRecommenderRecipe(recommendation)
+      setRecommenderRerollToken(recommendation.reroll_token ?? 1)
+      setRecommenderLocked(true)
+    } catch (recommendError) {
+      setError(recommendError.message)
+    } finally {
+      setRecommenderLoading(false)
+    }
+  }
+
+  async function rerollRecommendation() {
+    const ethnicity = recommenderEthnicity.trim()
+    const ingredients = parseIngredients(recommenderIngredients)
+
+    if (!ethnicity || !ingredients.length) {
+      setError('Provide an ethnicity and ingredient list before rerolling.')
+      return
+    }
+
+    try {
+      setError('')
+      setRecommenderLoading(true)
+      const recommendation = await api.recommendRecipe({
+        ethnicity,
+        ingredients,
+        reroll_token: recommenderRerollToken,
+      })
+      setRecommenderRecipe(recommendation)
+      setRecommenderRerollToken(recommendation.reroll_token ?? recommenderRerollToken + 1)
+    } catch (rerollError) {
+      setError(rerollError.message)
+    } finally {
+      setRecommenderLoading(false)
     }
   }
 
@@ -706,22 +778,11 @@ function App() {
                       <strong>Take or upload recipe photos</strong>
                       <span>Add up to 5 images (JPG, PNG, WEBP, or HEIC).</span>
                       <div className="ripper-upload-actions">
-                        <label htmlFor="ripper-camera-input" className="ripper-upload-choice">
-                          Take Photo
-                        </label>
                         <label htmlFor="ripper-file-input" className="ripper-upload-choice">
                           Upload
                         </label>
                       </div>
                     </div>
-                    <input
-                      id="ripper-camera-input"
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      multiple
-                      onChange={handleRecipeRipperFileChange}
-                    />
                     <input
                       id="ripper-file-input"
                       type="file"
@@ -836,11 +897,65 @@ function App() {
                 <div>
                   <BackButton label="Back to Tools" onClick={returnToToolList} />
                   <h2>AI Recommender</h2>
-                  <p>This tool is planned but not available yet.</p>
+                  <p>Get recipe suggestions based only on your chosen ethnicity and ingredients.</p>
                 </div>
               </div>
               <article className="tool-card tool-detail-card">
-                <p className="empty-copy">AI Recommender is coming soon.</p>
+                <form className="form-block" onSubmit={recommendRecipeWithCurrentInputs}>
+                  <label>
+                    Ethnicity
+                    <input
+                      value={recommenderEthnicity}
+                      onChange={(event) => setRecommenderEthnicity(event.target.value)}
+                      placeholder="Mexican"
+                      disabled={recommenderLocked || recommenderLoading}
+                    />
+                  </label>
+
+                  <label>
+                    Ingredients (one per line)
+                    <textarea
+                      value={recommenderIngredients}
+                      onChange={(event) => setRecommenderIngredients(event.target.value)}
+                      rows={6}
+                      placeholder={'Chicken breast\nLime\nGarlic\nCumin'}
+                      disabled={recommenderLocked || recommenderLoading}
+                    />
+                  </label>
+
+                  {!recommenderRecipe ? (
+                    <div className="row-actions">
+                      <button type="submit" disabled={recommenderLoading}>
+                        {recommenderLoading ? 'Recommending...' : 'Get Recommendation'}
+                      </button>
+                    </div>
+                  ) : null}
+                </form>
+
+                {recommenderRecipe ? (
+                  <div className="recipe-detail-card">
+                    <h3>{recommenderRecipe.recipe_name}</h3>
+                    <p>
+                      Ethnicity: <strong>{recommenderRecipe.ethnicity}</strong>
+                    </p>
+                    <h4>Ingredients</h4>
+                    <ul>
+                      {recommenderRecipe.ingredients.map((item, index) => (
+                        <li key={`${item}-${index}`}>{item}</li>
+                      ))}
+                    </ul>
+                    <h4>Directions</h4>
+                    <p>{recommenderRecipe.directions}</p>
+                    <div className="row-actions">
+                      <button type="button" onClick={rerollRecommendation} disabled={recommenderLoading}>
+                        {recommenderLoading ? 'Rerolling...' : 'Reroll'}
+                      </button>
+                      <button type="button" onClick={resetRecommender} disabled={recommenderLoading}>
+                        Start Over
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </article>
             </>
           ) : null}
