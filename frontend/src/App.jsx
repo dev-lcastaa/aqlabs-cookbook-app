@@ -58,6 +58,10 @@ function App() {
   const [ripperParsing, setRipperParsing] = useState(false)
   const [ripperDraft, setRipperDraft] = useState(null)
   const [ripperTargetCookbookId, setRipperTargetCookbookId] = useState('')
+  const [socialRipperUrl, setSocialRipperUrl] = useState('')
+  const [socialRipperParsing, setSocialRipperParsing] = useState(false)
+  const [socialRipperDraft, setSocialRipperDraft] = useState(null)
+  const [socialRipperTargetCookbookId, setSocialRipperTargetCookbookId] = useState('')
   const [recommenderEthnicity, setRecommenderEthnicity] = useState('')
   const [recommenderIngredients, setRecommenderIngredients] = useState('')
   const [recommenderLoading, setRecommenderLoading] = useState(false)
@@ -164,6 +168,7 @@ function App() {
     setActiveSection('tools')
     setActiveToolTile(null)
     resetRecipeRipper()
+    resetSocialRecipeRipper()
     resetRecommender()
   }
 
@@ -171,6 +176,7 @@ function App() {
     setActiveSection('home')
     setActiveToolTile(null)
     resetRecipeRipper()
+    resetSocialRecipeRipper()
     resetRecommender()
     setSelectedCookbookId(null)
     setSelectedCookbook(null)
@@ -197,6 +203,7 @@ function App() {
   function returnToToolList() {
     setActiveToolTile(null)
     resetRecipeRipper()
+    resetSocialRecipeRipper()
     resetRecommender()
   }
 
@@ -209,6 +216,13 @@ function App() {
     setRipperDraft(null)
     setRipperParsing(false)
     setRipperTargetCookbookId('')
+  }
+
+  function resetSocialRecipeRipper() {
+    setSocialRipperUrl('')
+    setSocialRipperParsing(false)
+    setSocialRipperDraft(null)
+    setSocialRipperTargetCookbookId('')
   }
 
   function resetRecommender() {
@@ -425,6 +439,37 @@ function App() {
     }
   }
 
+  async function parseRecipeFromSocial() {
+    const url = socialRipperUrl.trim()
+
+    if (!url) {
+      setError('Provide a public post URL before parsing.')
+      return
+    }
+
+    try {
+      setError('')
+      setSocialRipperParsing(true)
+      const parsed = await api.parseRecipeFromSocial({
+        url,
+      })
+      setSocialRipperDraft({
+        recipe_name: parsed.recipe_name || '',
+        ethnicity: parsed.ethnicity || '',
+        ingredients: Array.isArray(parsed.ingredients) ? parsed.ingredients.join('\n') : '',
+        directions: parsed.directions || '',
+      })
+
+      if (selectedCookbookId) {
+        setSocialRipperTargetCookbookId(String(selectedCookbookId))
+      }
+    } catch (parseError) {
+      setError(parseError.message)
+    } finally {
+      setSocialRipperParsing(false)
+    }
+  }
+
   async function saveRippedRecipe(event) {
     event.preventDefault()
     if (!ripperDraft) {
@@ -457,6 +502,47 @@ function App() {
         await refreshCurrentCookbook()
       }
 
+      returnToToolList()
+    } catch (saveError) {
+      setError(saveError.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function saveSocialRippedRecipe(event) {
+    event.preventDefault()
+    if (!socialRipperDraft) {
+      return
+    }
+
+    const cookbookId = Number(socialRipperTargetCookbookId)
+    if (!cookbookId) {
+      setError('Select a target cookbook before saving.')
+      return
+    }
+
+    if (!socialRipperDraft.recipe_name.trim() || !socialRipperDraft.directions.trim()) {
+      setError('Recipe name and directions are required before saving.')
+      return
+    }
+
+    try {
+      setSaving(true)
+      setError('')
+      await api.createRecipe({
+        cookbook_id: cookbookId,
+        recipe_name: socialRipperDraft.recipe_name.trim(),
+        ethnicity: socialRipperDraft.ethnicity.trim() || null,
+        ingredients: parseIngredients(socialRipperDraft.ingredients),
+        directions: socialRipperDraft.directions.trim(),
+      })
+
+      if (selectedCookbookId === cookbookId) {
+        await refreshCurrentCookbook()
+      }
+
+      resetSocialRecipeRipper()
       returnToToolList()
     } catch (saveError) {
       setError(saveError.message)
@@ -786,11 +872,100 @@ function App() {
                 <div>
                   <BackButton label="Back to Recipe Ripper" onClick={returnToRecipeRipperList} />
                   <h2>Social Media Recipe Ripper</h2>
-                  <p>This flow is planned but not available yet.</p>
+                  <p>Paste a public post URL and let the backend pull the page content, metadata, and visible text before parsing.</p>
                 </div>
               </div>
               <article className="tool-card tool-detail-card">
-                <p className="empty-copy">Social Media Recipe Ripper is coming soon.</p>
+                {!socialRipperDraft ? (
+                  <form className="form-block" onSubmit={(event) => { event.preventDefault(); parseRecipeFromSocial(); }}>
+                    <label>
+                      Post URL
+                      <input
+                        value={socialRipperUrl}
+                        onChange={(event) => setSocialRipperUrl(event.target.value)}
+                        placeholder="https://..."
+                        required
+                      />
+                    </label>
+
+                    <div className="row-actions">
+                      <button type="submit" disabled={socialRipperParsing || saving}>
+                        {socialRipperParsing ? 'Parsing...' : 'Parse Recipe'}
+                      </button>
+                      <button type="button" onClick={resetSocialRecipeRipper} disabled={socialRipperParsing || saving || !socialRipperUrl}>
+                        Reset
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <form className="form-block" onSubmit={saveSocialRippedRecipe}>
+                    <label>
+                      Recipe Name
+                      <input
+                        value={socialRipperDraft.recipe_name}
+                        onChange={(event) =>
+                          setSocialRipperDraft((prev) => ({ ...prev, recipe_name: event.target.value }))
+                        }
+                      />
+                    </label>
+
+                    <label>
+                      Target Cookbook
+                      <select
+                        value={socialRipperTargetCookbookId}
+                        onChange={(event) => setSocialRipperTargetCookbookId(event.target.value)}
+                      >
+                        <option value="">Select a cookbook</option>
+                        {cookbooks.map((cookbook) => (
+                          <option key={cookbook.id} value={cookbook.id}>
+                            {cookbook.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <label>
+                      Ethnicity (optional)
+                      <input
+                        value={socialRipperDraft.ethnicity}
+                        onChange={(event) =>
+                          setSocialRipperDraft((prev) => ({ ...prev, ethnicity: event.target.value }))
+                        }
+                      />
+                    </label>
+
+                    <label>
+                      Ingredients (one per line)
+                      <textarea
+                        value={socialRipperDraft.ingredients}
+                        onChange={(event) =>
+                          setSocialRipperDraft((prev) => ({ ...prev, ingredients: event.target.value }))
+                        }
+                        rows={5}
+                      />
+                    </label>
+
+                    <label>
+                      Directions
+                      <textarea
+                        value={socialRipperDraft.directions}
+                        onChange={(event) =>
+                          setSocialRipperDraft((prev) => ({ ...prev, directions: event.target.value }))
+                        }
+                        rows={6}
+                      />
+                    </label>
+
+                    <div className="row-actions">
+                      <button type="submit" disabled={saving || socialRipperParsing}>
+                        {saving ? 'Saving...' : 'Save Recipe'}
+                      </button>
+                      <button type="button" onClick={resetSocialRecipeRipper} disabled={saving || socialRipperParsing}>
+                        Start Over
+                      </button>
+                    </div>
+                  </form>
+                )}
               </article>
             </>
           ) : null}

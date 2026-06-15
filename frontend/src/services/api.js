@@ -94,6 +94,12 @@ export const api = {
       method: 'POST',
     })
   },
+  parseRecipeFromSocial(payload) {
+    return request('/recipes/parse-from-social', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
   recommendRecipe(payload) {
     return request('/recipes/recommend', {
       method: 'POST',

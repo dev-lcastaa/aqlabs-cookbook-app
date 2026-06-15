@@ -35,6 +35,11 @@ class RecipeRipperParseRead(BaseModel):
     directions: str = Field(..., min_length=1)
 
 
+class SocialRecipeRipperRequest(BaseModel):
+    url: str = Field(..., min_length=1, max_length=2000)
+    text: str | None = Field(default=None)
+
+
 class AIRecommendationRequest(BaseModel):
     ethnicity: str = Field(..., min_length=1, max_length=120)
     ingredients: list[str] = Field(..., min_length=1, max_length=50)
