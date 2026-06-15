@@ -6,6 +6,7 @@ function App() {
   const [cookbooks, setCookbooks] = useState([])
   const [selectedCookbookId, setSelectedCookbookId] = useState(null)
   const [selectedCookbook, setSelectedCookbook] = useState(null)
+  const [selectedRecipeId, setSelectedRecipeId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -31,6 +32,7 @@ function App() {
   })
 
   const isInsideCookbook = selectedCookbookId !== null
+  const selectedRecipe = selectedCookbook?.recipes?.find((recipe) => recipe.id === selectedRecipeId) ?? null
 
   const cookbookCountLabel = useMemo(() => {
     if (cookbooks.length === 1) {
@@ -49,6 +51,7 @@ function App() {
       if (selectedCookbookId && !list.some((cb) => cb.id === selectedCookbookId)) {
         setSelectedCookbookId(null)
         setSelectedCookbook(null)
+        setSelectedRecipeId(null)
       }
     } catch (loadError) {
       setError(loadError.message)
@@ -70,6 +73,7 @@ function App() {
       const detail = await api.getCookbook(cookbookId)
       setSelectedCookbookId(cookbookId)
       setSelectedCookbook(detail)
+      setSelectedRecipeId(null)
       setEditingCookbook(false)
       setEditingRecipeId(null)
       setShowRecipeForm(false)
@@ -83,9 +87,15 @@ function App() {
   function returnToCookbooks() {
     setSelectedCookbookId(null)
     setSelectedCookbook(null)
+    setSelectedRecipeId(null)
     setEditingCookbook(false)
     setEditingRecipeId(null)
     setShowRecipeForm(false)
+  }
+
+  function returnToRecipes() {
+    setSelectedRecipeId(null)
+    setEditingRecipeId(null)
   }
 
   async function refreshCurrentCookbook() {
@@ -94,6 +104,9 @@ function App() {
     }
     const detail = await api.getCookbook(selectedCookbookId)
     setSelectedCookbook(detail)
+    if (selectedRecipeId && !detail.recipes.some((recipe) => recipe.id === selectedRecipeId)) {
+      setSelectedRecipeId(null)
+    }
   }
 
   async function handleCreateCookbook(event) {
@@ -232,6 +245,9 @@ function App() {
       setSaving(true)
       setError('')
       await api.deleteRecipe(recipeId)
+      if (selectedRecipeId === recipeId) {
+        setSelectedRecipeId(null)
+      }
       await refreshCurrentCookbook()
     } catch (saveError) {
       setError(saveError.message)
@@ -294,36 +310,120 @@ function App() {
             </form>
           ) : null}
 
-          {!loading && cookbooks.length === 0 ? (
-            <p className="empty-copy">No cookbooks</p>
-          ) : null}
+          {!loading && cookbooks.length === 0 ? <p className="empty-copy">No cookbooks</p> : null}
 
           <div className="cookbook-grid">
             {cookbooks.map((cookbook) => (
-              <article className="cookbook-grid-card" key={cookbook.id}>
-                <button
-                  type="button"
-                  className="card-main"
-                  onClick={() => enterCookbook(cookbook.id)}
-                >
-                  <span className="tile-heading">
-                    <span className="tile-icon" aria-hidden="true">
-                      <BookIcon />
-                    </span>
-                    <strong>{cookbook.name}</strong>
+              <button
+                type="button"
+                className="cookbook-grid-card tile-button"
+                key={cookbook.id}
+                onClick={() => enterCookbook(cookbook.id)}
+              >
+                <span className="tile-heading">
+                  <span className="tile-icon" aria-hidden="true">
+                    <BookIcon />
                   </span>
-                  <span>{cookbook.ethnicity}</span>
-                </button>
-                <button
-                  type="button"
-                  className="danger-link"
-                  onClick={() => handleDeleteCookbook(cookbook.id)}
-                  disabled={saving}
-                >
-                  Delete
-                </button>
-              </article>
+                  <strong>{cookbook.name}</strong>
+                </span>
+              </button>
             ))}
+          </div>
+
+          {selectedCookbookId ? null : cookbooks.length === 0 ? null : (
+            <div className="action-bar">
+              <p className="muted">Select a cookbook tile to manage it.</p>
+            </div>
+          )}
+        </section>
+      ) : selectedRecipe ? (
+        <section className="panel recipe-detail-view">
+          <div className="detail-head">
+            <div>
+              <button type="button" className="ghost-link" onClick={returnToRecipes}>
+                Back to Recipes
+              </button>
+              <h2>{selectedRecipe.recipe_name}</h2>
+              <p>
+                Ethnicity: <strong>{selectedRecipe.ethnicity}</strong>
+              </p>
+            </div>
+          </div>
+
+          {editingRecipeId === selectedRecipe.id ? (
+            <form className="form-block inline-edit" onSubmit={(event) => handleUpdateRecipe(event, selectedRecipe.id)}>
+              <label>
+                Recipe Name
+                <input
+                  value={recipeDraft.recipe_name}
+                  onChange={(event) =>
+                    setRecipeDraft((prev) => ({ ...prev, recipe_name: event.target.value }))
+                  }
+                />
+              </label>
+              <label>
+                Ethnicity
+                <input
+                  value={recipeDraft.ethnicity}
+                  onChange={(event) =>
+                    setRecipeDraft((prev) => ({ ...prev, ethnicity: event.target.value }))
+                  }
+                />
+              </label>
+              <label>
+                Ingredients
+                <textarea
+                  value={recipeDraft.ingredients}
+                  onChange={(event) =>
+                    setRecipeDraft((prev) => ({ ...prev, ingredients: event.target.value }))
+                  }
+                  rows={4}
+                />
+              </label>
+              <label>
+                Directions
+                <textarea
+                  value={recipeDraft.directions}
+                  onChange={(event) =>
+                    setRecipeDraft((prev) => ({ ...prev, directions: event.target.value }))
+                  }
+                  rows={5}
+                />
+              </label>
+              <div className="row-actions">
+                <button type="submit" disabled={saving}>
+                  Save
+                </button>
+                <button type="button" onClick={() => setEditingRecipeId(null)}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="recipe-detail-card">
+              <h3>Ingredients</h3>
+              <ul>
+                {selectedRecipe.ingredients.map((item, index) => (
+                  <li key={`${selectedRecipe.id}-${index}`}>{item}</li>
+                ))}
+              </ul>
+              <h3>Directions</h3>
+              <p>{selectedRecipe.directions}</p>
+            </div>
+          )}
+
+          <div className="action-bar">
+            <button type="button" onClick={() => startEditingRecipe(selectedRecipe)} disabled={saving}>
+              Edit Recipe
+            </button>
+            <button
+              type="button"
+              className="danger-link"
+              onClick={() => handleDeleteRecipe(selectedRecipe.id)}
+              disabled={saving}
+            >
+              Delete Recipe
+            </button>
           </div>
         </section>
       ) : (
@@ -337,19 +437,6 @@ function App() {
               <p>
                 Ethnicity: <strong>{selectedCookbook?.ethnicity}</strong>
               </p>
-            </div>
-            <div className="row-actions">
-              <button type="button" onClick={startEditingCookbook} disabled={saving || loading}>
-                Edit Cookbook
-              </button>
-              <button
-                type="button"
-                className="danger-link"
-                onClick={() => handleDeleteCookbook(selectedCookbookId)}
-                disabled={saving}
-              >
-                Delete Cookbook
-              </button>
             </div>
           </div>
 
@@ -446,95 +533,34 @@ function App() {
             {selectedCookbook?.recipes?.length ? null : <p className="empty-copy">No recipes</p>}
 
             {selectedCookbook?.recipes?.map((recipe) => (
-              <article className="recipe-card" key={recipe.id}>
-                {editingRecipeId === recipe.id ? (
-                  <form
-                    className="form-block inline-edit"
-                    onSubmit={(event) => handleUpdateRecipe(event, recipe.id)}
-                  >
-                    <label>
-                      Recipe Name
-                      <input
-                        value={recipeDraft.recipe_name}
-                        onChange={(event) =>
-                          setRecipeDraft((prev) => ({ ...prev, recipe_name: event.target.value }))
-                        }
-                      />
-                    </label>
-                    <label>
-                      Ethnicity
-                      <input
-                        value={recipeDraft.ethnicity}
-                        onChange={(event) =>
-                          setRecipeDraft((prev) => ({ ...prev, ethnicity: event.target.value }))
-                        }
-                      />
-                    </label>
-                    <label>
-                      Ingredients
-                      <textarea
-                        value={recipeDraft.ingredients}
-                        onChange={(event) =>
-                          setRecipeDraft((prev) => ({ ...prev, ingredients: event.target.value }))
-                        }
-                        rows={4}
-                      />
-                    </label>
-                    <label>
-                      Directions
-                      <textarea
-                        value={recipeDraft.directions}
-                        onChange={(event) =>
-                          setRecipeDraft((prev) => ({ ...prev, directions: event.target.value }))
-                        }
-                        rows={5}
-                      />
-                    </label>
-                    <div className="row-actions">
-                      <button type="submit" disabled={saving}>
-                        Save
-                      </button>
-                      <button type="button" onClick={() => setEditingRecipeId(null)}>
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  <>
-                    <div className="recipe-title">
-                      <span className="tile-heading">
-                        <span className="tile-icon" aria-hidden="true">
-                          <PageIcon />
-                        </span>
-                        <h4>{recipe.recipe_name}</h4>
-                      </span>
-                      <span>{recipe.ethnicity}</span>
-                    </div>
-                    <h5>Ingredients</h5>
-                    <ul>
-                      {recipe.ingredients.map((item, index) => (
-                        <li key={`${recipe.id}-${index}`}>{item}</li>
-                      ))}
-                    </ul>
-                    <h5>Directions</h5>
-                    <p>{recipe.directions}</p>
-                    <div className="row-actions">
-                      <button type="button" onClick={() => startEditingRecipe(recipe)}>
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="danger-link"
-                        onClick={() => handleDeleteRecipe(recipe.id)}
-                        disabled={saving}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </>
-                )}
-              </article>
+              <button
+                type="button"
+                className="recipe-card tile-button"
+                key={recipe.id}
+                onClick={() => setSelectedRecipeId(recipe.id)}
+              >
+                <span className="tile-heading">
+                  <span className="tile-icon" aria-hidden="true">
+                    <PageIcon />
+                  </span>
+                  <strong>{recipe.recipe_name}</strong>
+                </span>
+              </button>
             ))}
+          </div>
+
+          <div className="action-bar">
+            <button type="button" onClick={startEditingCookbook} disabled={saving || loading}>
+              Edit Cookbook
+            </button>
+            <button
+              type="button"
+              className="danger-link"
+              onClick={() => handleDeleteCookbook(selectedCookbookId)}
+              disabled={saving}
+            >
+              Delete Cookbook
+            </button>
           </div>
         </section>
       )}
